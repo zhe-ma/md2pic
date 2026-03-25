@@ -1181,8 +1181,21 @@
             </div>
 
             <div class="control-group">
+                <label>大小:</label>
+                <input type="number" id="baseFontSize" value="14" min="10" max="30" step="1">px
+                <label>行距:</label>
+                <input type="number" id="lineHeight" value="1.8" min="1.0" max="3.0" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <label>分割:</label>
+                <select id="splitMethod">
+                    <option value="auto">智能按字数</option>
+                    <option value="heading">按H1/H2标题</option>
+                    <option value="manual">仅手动(---)</option>
+                </select>
                 <label>字符:</label>
-                <input type="number" id="maxChars" value="500" min="200" max="1500" step="50">
+                <input type="number" id="maxChars" value="500" min="100" max="2000" step="50">
             </div>
 
             <div class="control-group">
@@ -1207,17 +1220,8 @@
                 <button class="btn btn-primary" id="templatesBtn">
                     <span>📋</span> 模板
                 </button>
-                <button class="btn btn-info" id="importConfigBtn">
-                    <span>📂</span> 导入
-                </button>
-            </div>
-
-            <div class="control-group">
                 <button class="btn btn-success" id="exportZipBtn">
-                    <span>📦</span> ZIP
-                </button>
-                <button class="btn btn-danger" id="exportConfigBtn">
-                    <span>💾</span> 配置
+                    <span>📦</span> 导出ZIP
                 </button>
             </div>
         </div>
@@ -1280,15 +1284,11 @@
     <div id="keyboardHint" class="keyboard-hint">
         <h4>⌨️ 快捷键</h4>
         <ul>
-            <li><span class="kbd">Ctrl+S</span> 保存草稿</li>
             <li><span class="kbd">Ctrl+E</span> 导出ZIP</li>
-            <li><span class="kbd">Ctrl+I</span> 导入配置</li>
             <li><span class="kbd">Ctrl+T</span> 打开模板</li>
             <li><span class="kbd">?</span> 显示帮助</li>
         </ul>
     </div>
-
-    <div class="main-container">
         <div class="left-panel">
             <div class="panel-header">
                 <h3>📝 Markdown编辑器</h3>
@@ -1376,9 +1376,6 @@
         <div id="statusText">准备就绪 | v4.2豪华版 | 147项专业资源</div>
         <div id="statsText">平台: 小红书 3:4 | 字体: 思源黑体 | 主题: 默认简约</div>
     </div>
-
-    <!-- 隐藏的文件输入 -->
-    <input type="file" id="configFileInput" accept=".json">
 
     <script>
         // ==================== 数据配置 ====================
@@ -2330,67 +2327,32 @@ if age >= 18:
             borderColor: '#C9A88C',
             frameTheme: 'rounded-shadow',
             borderWidth: 4,
-            maxChars: 500
+            maxChars: 500,
+            splitMethod: 'auto',
+            baseFontSize: 14,
+            lineHeight: 1.8
         };
 
-        let autoSaveTimer = null;
         let previewCards = [];
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
-            loadConfig();
             initEventListeners();
             initModals();
-            loadDraft();
             updatePreview();
-            startAutoSave();
             updateStats();
         });
 
-        // 加载配置
-        function loadConfig() {
-            const saved = localStorage.getItem('md-images-config-v4.2');
-            if (saved) {
-                currentConfig = { ...currentConfig, ...JSON.parse(saved) };
-                applyConfig();
-            }
-        }
-
         // 应用配置
         function applyConfig() {
-            document.getElementById('aspectRatio').value = currentConfig.aspectRatio;
-            document.getElementById('fontFamily').value = currentConfig.fontFamily;
-            document.getElementById('mdTheme').value = currentConfig.mdTheme;
-            document.getElementById('bgColor').value = currentConfig.bgColor;
-            document.getElementById('borderColor').value = currentConfig.borderColor;
-            document.getElementById('frameTheme').value = currentConfig.frameTheme;
-            document.getElementById('borderWidth').value = currentConfig.borderWidth;
-            document.getElementById('maxChars').value = currentConfig.maxChars;
-        }
-
-        // 保存配置
-        function saveConfig() {
-            localStorage.setItem('md-images-config-v4.2', JSON.stringify(currentConfig));
-        }
-
-        // 加载草稿
-        function loadDraft() {
-            const draft = localStorage.getItem('md-images-draft-v4.2');
-            if (draft) {
-                document.getElementById('markdownInput').value = draft;
-            }
-        }
-
-        // 自动保存草稿
-        function startAutoSave() {
-            const textarea = document.getElementById('markdownInput');
-            textarea.addEventListener('input', function() {
-                clearTimeout(autoSaveTimer);
-                autoSaveTimer = setTimeout(function() {
-                    localStorage.setItem('md-images-draft-v4.2', textarea.value);
-                    showStatus('✅ 草稿已自动保存', 2000);
-                }, 3000);
-            });
+            document.getElementById('aspectRatio').value = currentConfig.aspectRatio || '3:4';
+            document.getElementById('fontFamily').value = currentConfig.fontFamily || "'Noto Sans SC'";
+            document.getElementById('mdTheme').value = currentConfig.mdTheme || 'default';
+            document.getElementById('bgColor').value = currentConfig.bgColor || '#FFFFFF';
+            document.getElementById('borderColor').value = currentConfig.borderColor || '#C9A88C';
+            document.getElementById('frameTheme').value = currentConfig.frameTheme || 'rounded-shadow';
+            document.getElementById('borderWidth').value = currentConfig.borderWidth || 4;
+            if(currentConfig.maxChars) document.getElementById('maxChars').value = currentConfig.maxChars;
         }
 
         // 初始化事件监听
@@ -2399,13 +2361,13 @@ if age >= 18:
             document.getElementById('updateBtn').addEventListener('click', updatePreview);
             
             // 下拉框实时预览监听
-            const selectsToWatch = ['aspectRatio', 'fontFamily', 'mdTheme', 'frameTheme'];
+            const selectsToWatch = ['aspectRatio', 'fontFamily', 'mdTheme', 'frameTheme', 'splitMethod'];
             selectsToWatch.forEach(id => {
                 document.getElementById(id).addEventListener('change', updatePreview);
             });
             
             // 输入框和颜色选择器防抖实时预览
-            const inputsToWatch = ['bgColor', 'borderColor', 'borderWidth', 'maxChars'];
+            const inputsToWatch = ['bgColor', 'borderColor', 'borderWidth', 'maxChars', 'baseFontSize', 'lineHeight'];
             inputsToWatch.forEach(id => {
                 document.getElementById(id).addEventListener('input', function() {
                     clearTimeout(window.previewTimer);
@@ -2422,15 +2384,6 @@ if age >= 18:
             
             // 导出ZIP
             document.getElementById('exportZipBtn').addEventListener('click', exportAllAsZip);
-            
-            // 导出配置
-            document.getElementById('exportConfigBtn').addEventListener('click', exportConfig);
-            
-            // 导入配置
-            document.getElementById('importConfigBtn').addEventListener('click', function() {
-                document.getElementById('configFileInput').click();
-            });
-            document.getElementById('configFileInput').addEventListener('change', importConfig);
             
             // 打开模态框
             document.getElementById('fontsBtn').addEventListener('click', function() {
@@ -2462,18 +2415,9 @@ if age >= 18:
             document.addEventListener('keydown', function(e) {
                 if (e.ctrlKey || e.metaKey) {
                     switch(e.key.toLowerCase()) {
-                        case 's':
-                            e.preventDefault();
-                            localStorage.setItem('md-images-draft-v4.2', document.getElementById('markdownInput').value);
-                            showStatus('✅ 草稿已保存', 2000);
-                            break;
                         case 'e':
                             e.preventDefault();
                             exportAllAsZip();
-                            break;
-                        case 'i':
-                            e.preventDefault();
-                            document.getElementById('configFileInput').click();
                             break;
                         case 't':
                             e.preventDefault();
@@ -2629,7 +2573,6 @@ if age >= 18:
         function selectFont(family) {
             currentConfig.fontFamily = family;
             document.getElementById('fontFamily').value = family;
-            saveConfig();
             updatePreview();
             document.getElementById('fontsModal').style.display = 'none';
             showStatus('✅ 字体已应用', 2000);
@@ -2639,7 +2582,6 @@ if age >= 18:
         function selectTheme(themeId) {
             currentConfig.mdTheme = themeId;
             document.getElementById('mdTheme').value = themeId;
-            saveConfig();
             updatePreview();
             document.getElementById('themesModal').style.display = 'none';
             showStatus('✅ 主题已应用', 2000);
@@ -2651,7 +2593,6 @@ if age >= 18:
             currentConfig.borderColor = border;
             document.getElementById('bgColor').value = bg;
             document.getElementById('borderColor').value = border;
-            saveConfig();
             updatePreview();
             document.getElementById('colorsModal').style.display = 'none';
             showStatus('✅ 配色已应用', 2000);
@@ -2669,7 +2610,6 @@ if age >= 18:
                 currentConfig = { ...currentConfig, ...template.config };
                 document.getElementById('markdownInput').value = template.content;
                 applyConfig();
-                saveConfig();
                 updatePreview();
                 document.getElementById('templatesModal').style.display = 'none';
                 showStatus('✅ 模板已应用', 2000);
@@ -2687,8 +2627,11 @@ if age >= 18:
             currentConfig.frameTheme = document.getElementById('frameTheme').value;
             currentConfig.borderWidth = parseInt(document.getElementById('borderWidth').value);
             currentConfig.maxChars = parseInt(document.getElementById('maxChars').value);
+            currentConfig.splitMethod = document.getElementById('splitMethod').value;
+            currentConfig.baseFontSize = parseInt(document.getElementById('baseFontSize').value);
+            currentConfig.lineHeight = parseFloat(document.getElementById('lineHeight').value);
             
-            saveConfig();
+            updateDynamicStyles();
             
             const markdown = document.getElementById('markdownInput').value;
             if (!markdown.trim()) {
@@ -2706,7 +2649,7 @@ if age >= 18:
             }
             
             // 分割Markdown
-            const chunks = splitMarkdown(markdown, currentConfig.maxChars);
+            const chunks = splitMarkdown(markdown);
             previewCards = chunks;
             
             // 渲染预览卡片
@@ -2717,8 +2660,38 @@ if age >= 18:
             updateStats();
         }
 
+        // 更新自定义样式
+        function updateDynamicStyles() {
+            const styleId = 'dynamic-styles';
+            let styleEl = document.getElementById(styleId);
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+            
+            const fs = currentConfig.baseFontSize;
+            const lh = currentConfig.lineHeight;
+            
+            styleEl.textContent = `
+                .preview-content p, 
+                .preview-content li, 
+                .preview-content td, 
+                .preview-content th,
+                .preview-content table {
+                    font-size: ${fs}px !important;
+                    line-height: ${lh} !important;
+                }
+                .preview-content h1 { font-size: ${fs * 1.8}px !important; line-height: 1.3 !important; }
+                .preview-content h2 { font-size: ${fs * 1.5}px !important; line-height: 1.4 !important; }
+                .preview-content h3 { font-size: ${fs * 1.25}px !important; line-height: 1.5 !important; }
+            `;
+        }
+
         // 分割Markdown
-        function splitMarkdown(text, maxChars) {
+        function splitMarkdown(text) {
+            const maxChars = currentConfig.maxChars;
+            const method = currentConfig.splitMethod;
             const lines = text.split('\n');
             const chunks = [];
             let currentChunk = '';
@@ -2729,36 +2702,61 @@ if age >= 18:
                 const lineLength = line.length + 1; // +1 for newline
                 
                 // 判断是否为标题或分隔符
+                const isH1H2 = /^#{1,2}\s/.test(line);
                 const isHeading = /^#{1,6}\s/.test(line);
                 const isDivider = /^---+$/.test(line);
                 
-                // 如果当前行是分隔符，作为分割点
-                if (isDivider) {
-                    currentChunk += line + '\n';
-                    if (currentChunk.trim()) {
-                        chunks.push(currentChunk.trim());
-                        currentChunk = '';
-                        currentLength = 0;
+                if (method === 'manual') {
+                    if (isDivider) {
+                        if (currentChunk.trim()) {
+                            chunks.push(currentChunk.trim());
+                            currentChunk = '';
+                        }
+                        continue;
                     }
-                    continue;
-                }
-                
-                // 如果添加当前行会超出限制
-                if (currentLength + lineLength > maxChars && currentChunk.trim()) {
-                    // 如果当前行是标题，优先保留到下一页
-                    if (isHeading) {
+                    currentChunk += line + '\n';
+                } else if (method === 'heading') {
+                    if (isDivider) {
+                        if (currentChunk.trim()) {
+                            chunks.push(currentChunk.trim());
+                            currentChunk = '';
+                        }
+                        continue;
+                    }
+                    if (isH1H2 && currentChunk.trim()) {
                         chunks.push(currentChunk.trim());
                         currentChunk = line + '\n';
-                        currentLength = lineLength;
                     } else {
                         currentChunk += line + '\n';
-                        chunks.push(currentChunk.trim());
-                        currentChunk = '';
-                        currentLength = 0;
                     }
                 } else {
-                    currentChunk += line + '\n';
-                    currentLength += lineLength;
+                    // auto - 智能按字数
+                    if (isDivider) {
+                        if (currentChunk.trim()) {
+                            chunks.push(currentChunk.trim());
+                            currentChunk = '';
+                            currentLength = 0;
+                        }
+                        continue;
+                    }
+                    
+                    // 如果添加当前行会超出限制
+                    if (currentLength + lineLength > maxChars && currentChunk.trim()) {
+                        // 如果当前行是标题，优先保留到下一页
+                        if (isHeading) {
+                            chunks.push(currentChunk.trim());
+                            currentChunk = line + '\n';
+                            currentLength = lineLength;
+                        } else {
+                            currentChunk += line + '\n';
+                            chunks.push(currentChunk.trim());
+                            currentChunk = '';
+                            currentLength = 0;
+                        }
+                    } else {
+                        currentChunk += line + '\n';
+                        currentLength += lineLength;
+                    }
                 }
             }
             
@@ -2917,59 +2915,6 @@ if age >= 18:
                 hideLoading();
                 showStatus('❌ 导出失败: ' + error.message, 3000);
             }
-        }
-
-        // 导出配置
-        function exportConfig() {
-            const config = {
-                version: '4.2',
-                config: currentConfig,
-                content: document.getElementById('markdownInput').value,
-                timestamp: new Date().toISOString()
-            };
-            
-            const dataStr = JSON.stringify(config, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.download = `config-${Date.now()}.json`;
-            link.href = url;
-            link.click();
-            URL.revokeObjectURL(url);
-            
-            showStatus('✅ 配置已导出', 2000);
-        }
-
-        // 导入配置
-        function importConfig(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    const data = JSON.parse(event.target.result);
-                    
-                    if (data.config) {
-                        currentConfig = { ...currentConfig, ...data.config };
-                        applyConfig();
-                        saveConfig();
-                    }
-                    
-                    if (data.content) {
-                        document.getElementById('markdownInput').value = data.content;
-                    }
-                    
-                    updatePreview();
-                    showStatus('✅ 配置导入成功', 2000);
-                } catch (error) {
-                    showStatus('❌ 配置文件格式错误', 3000);
-                }
-            };
-            reader.readAsText(file);
-            
-            // 清空input
-            e.target.value = '';
         }
 
         // 更新统计信息

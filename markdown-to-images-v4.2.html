@@ -12,6 +12,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@300;400;700&display=swap" rel="stylesheet">
     <!-- 手写字体 -->
     <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Long+Cang&display=swap" rel="stylesheet">
+    <!-- 创意字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=ZCOOL+XiaoWei&display=swap" rel="stylesheet">
     <!-- 等宽字体 -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
     
@@ -310,12 +312,14 @@
             margin: 16px auto;
             position: relative;
             overflow: hidden;
+            transform-origin: top center;
         }
 
         .preview-content {
             padding: 24px 20px;
             position: relative;
             z-index: 1;
+            transform-origin: top center;
         }
 
         .empty-state {
@@ -2394,6 +2398,28 @@ if age >= 18:
             // 更新按钮
             document.getElementById('updateBtn').addEventListener('click', updatePreview);
             
+            // 下拉框实时预览监听
+            const selectsToWatch = ['aspectRatio', 'fontFamily', 'mdTheme', 'frameTheme'];
+            selectsToWatch.forEach(id => {
+                document.getElementById(id).addEventListener('change', updatePreview);
+            });
+            
+            // 输入框和颜色选择器防抖实时预览
+            const inputsToWatch = ['bgColor', 'borderColor', 'borderWidth', 'maxChars'];
+            inputsToWatch.forEach(id => {
+                document.getElementById(id).addEventListener('input', function() {
+                    clearTimeout(window.previewTimer);
+                    window.previewTimer = setTimeout(updatePreview, 300);
+                });
+            });
+
+            // 文本框实时预览防抖
+            const textarea = document.getElementById('markdownInput');
+            textarea.addEventListener('input', function() {
+                clearTimeout(window.previewTimer);
+                window.previewTimer = setTimeout(updatePreview, 500);
+            });
+            
             // 导出ZIP
             document.getElementById('exportZipBtn').addEventListener('click', exportAllAsZip);
             
@@ -2633,6 +2659,11 @@ if age >= 18:
 
         // 应用模板
         function applyTemplate(category, templateId) {
+            const currentContent = document.getElementById('markdownInput').value.trim();
+            if (currentContent && !confirm('应用模板将会覆盖当前内容，是否继续？')) {
+                return;
+            }
+            
             const template = templateLibrary[category].find(t => t.id === templateId);
             if (template) {
                 currentConfig = { ...currentConfig, ...template.config };
@@ -2702,10 +2733,13 @@ if age >= 18:
                 const isDivider = /^---+$/.test(line);
                 
                 // 如果当前行是分隔符，作为分割点
-                if (isDivider && currentChunk.trim()) {
-                    chunks.push(currentChunk.trim());
-                    currentChunk = '';
-                    currentLength = 0;
+                if (isDivider) {
+                    currentChunk += line + '\n';
+                    if (currentChunk.trim()) {
+                        chunks.push(currentChunk.trim());
+                        currentChunk = '';
+                        currentLength = 0;
+                    }
                     continue;
                 }
                 
@@ -2788,6 +2822,32 @@ if age >= 18:
                 canvas.style.border = `${borderWidth}px solid ${borderColor}`;
                 canvas.style.boxShadow = 'none';
             }
+            
+            // 响应式缩放 (解决移动端溢出问题)
+            const containerWidth = canvas.parentElement.clientWidth - 32; // 考虑边距
+            if (width > containerWidth && containerWidth > 0) {
+                const scale = containerWidth / width;
+                canvas.style.transform = `scale(${scale})`;
+                canvas.parentElement.style.height = `${(height * scale) + 32}px`;
+            } else {
+                canvas.style.transform = 'none';
+                canvas.parentElement.style.height = 'auto';
+            }
+            
+            // 解决文字超出截断问题：自动缩放内容区
+            const content = canvas.querySelector('.preview-content');
+            if (content) {
+                content.style.transform = 'none'; // 先重置
+                // 使用 setTimeout 确保 DOM 已渲染完成能拿到准确的 scrollHeight
+                setTimeout(() => {
+                    const contentHeight = content.scrollHeight;
+                    // 内容高度超过画布时，稍微缩放
+                    if (contentHeight > height) {
+                        const scaleY = height / contentHeight;
+                        content.style.transform = `scale(${scaleY})`;
+                    }
+                }, 0);
+            }
         }
 
         // 导出单张
@@ -2839,11 +2899,9 @@ if age >= 18:
                         useCORS: true
                     }).then(c => c.toDataURL('image/png'));
                     
-                    // 转换为blob
+                    // 转换为base64直接写入ZIP
                     const base64 = dataUrl.split(',')[1];
-                    const blob = await fetch(`data:image/png;base64,${base64}`).then(r => r.blob());
-                    
-                    zip.file(`image-${String(i + 1).padStart(2, '0')}.png`, blob);
+                    zip.file(`image-${String(i + 1).padStart(2, '0')}.png`, base64, { base64: true });
                     
                     // 短暂延迟避免浏览器卡顿
                     await new Promise(resolve => setTimeout(resolve, 100));
@@ -2957,12 +3015,15 @@ if age >= 18:
         }
 
         // 显示状态消息
+        let statusTimer = null;
+        const defaultStatusText = "准备就绪 | v4.2豪华版 | 147项专业资源";
         function showStatus(message, duration = 2000) {
             const statusText = document.getElementById('statusText');
-            const originalText = statusText.textContent;
             statusText.textContent = message;
-            setTimeout(() => {
-                statusText.textContent = originalText;
+            
+            clearTimeout(statusTimer);
+            statusTimer = setTimeout(() => {
+                statusText.textContent = defaultStatusText;
             }, duration);
         }
     </script>

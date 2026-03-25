@@ -589,7 +589,7 @@
             }
         }
 
-        /* 边框样式 */
+        /* 相框与装饰样式 */
         .frame-rounded-shadow .preview-canvas {
             border-radius: 12px;
             box-shadow: 0 6px 20px rgba(0,0,0,0.12);
@@ -599,13 +599,47 @@
             border-radius: 8px;
         }
 
-        .frame-minimal .preview-canvas {
-            border-radius: 6px;
-        }
-
         .frame-none .preview-canvas {
             box-shadow: none;
             border: none;
+        }
+        
+        .preview-content-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .frame-decor-mac {
+            display: none;
+            position: absolute;
+            top: 16px;
+            left: 20px;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .mac-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.1);
+        }
+
+        .frame-decor-tape {
+            display: none;
+            position: absolute;
+            top: -16px;
+            left: 50%;
+            transform: translateX(-50%) rotate(-2deg);
+            width: 120px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.8);
+            backdrop-filter: blur(4px);
+            z-index: 10;
         }
 
         /* ==================== Markdown主题样式（12款）==================== */
@@ -1170,15 +1204,19 @@
             </div>
 
             <div class="control-group" style="border-right: none;">
-                <label>边框:</label>
+                <label>相框:</label>
                 <select id="frameTheme">
-                    <option value="rounded-shadow">圆角</option>
+                    <option value="none">无框</option>
+                    <option value="rounded-shadow">圆角阴影</option>
                     <option value="solid-border">纯色</option>
                     <option value="minimal">简约</option>
-                    <option value="none">无框</option>
+                    <option value="mac-window">Mac 视窗</option>
+                    <option value="polaroid">拍立得</option>
+                    <option value="tape">胶带便签</option>
+                    <option value="glow">渐变发光</option>
                 </select>
-                <input type="color" id="borderColor" value="#C9A88C">
-                <input type="number" id="borderWidth" value="4" min="1" max="20" style="width: 45px;">px
+                <input type="color" id="borderColor" value="#C9A88C" title="框色/背景色">
+                <input type="number" id="borderWidth" value="4" min="0" max="60" style="width: 45px;" title="线宽/边距">px
             </div>
         </div>
 
@@ -2782,7 +2820,15 @@ if age >= 18:
                         <button class="export-single-btn" onclick="exportSingle(${index})">导出</button>
                     </div>
                     <div class="preview-canvas" id="canvas-${index}">
-                        <div class="preview-content md-theme-${currentConfig.mdTheme}">${html}</div>
+                        <div class="preview-content-wrapper">
+                            <div class="frame-decor-tape"></div>
+                            <div class="frame-decor-mac">
+                                <span class="mac-dot" style="background:#ff5f56"></span>
+                                <span class="mac-dot" style="background:#ffbd2e"></span>
+                                <span class="mac-dot" style="background:#27c93f"></span>
+                            </div>
+                            <div class="preview-content md-theme-${currentConfig.mdTheme}">${html}</div>
+                        </div>
                     </div>
                 `;
                 
@@ -2802,18 +2848,102 @@ if age >= 18:
             
             canvas.style.width = width + 'px';
             canvas.style.height = height + 'px';
-            canvas.style.background = currentConfig.bgColor;
             canvas.style.fontFamily = currentConfig.fontFamily;
             
-            // 应用边框
-            const borderWidth = currentConfig.borderWidth;
-            const borderColor = currentConfig.borderColor;
+            // 重置基础样式
+            canvas.style.padding = '0';
+            canvas.style.border = 'none';
+            canvas.style.boxShadow = 'none';
+            canvas.style.background = currentConfig.bgColor; // 默认
+            canvas.style.backgroundImage = 'none';
             
-            if (currentConfig.frameTheme === 'solid-border') {
-                canvas.style.border = `${borderWidth}px solid ${borderColor}`;
-            } else if (currentConfig.frameTheme === 'minimal') {
-                canvas.style.border = `${borderWidth}px solid ${borderColor}`;
+            const wrapper = canvas.querySelector('.preview-content-wrapper');
+            if (wrapper) {
+                wrapper.style.background = 'transparent';
+                wrapper.style.borderRadius = '0';
+                wrapper.style.boxShadow = 'none';
+                wrapper.style.border = 'none';
+                wrapper.style.padding = '0';
+                wrapper.style.margin = '0';
+                wrapper.style.width = '100%';
+                wrapper.style.height = '100%';
+                wrapper.style.overflow = 'visible';
+            }
+
+            const macHeader = canvas.querySelector('.frame-decor-mac');
+            if (macHeader) macHeader.style.display = 'none';
+            const tapeDecor = canvas.querySelector('.frame-decor-tape');
+            if (tapeDecor) tapeDecor.style.display = 'none';
+
+            const content = canvas.querySelector('.preview-content');
+            if (content) {
+                content.style.padding = '24px 20px';
+                content.style.background = 'transparent';
+                content.style.height = 'auto';
+            }
+
+            // 应用边框相框主题
+            const bw = parseInt(currentConfig.borderWidth) || 0;
+            const bc = currentConfig.borderColor || '#000';
+            const frame = currentConfig.frameTheme;
+            
+            if (frame === 'solid-border') {
+                canvas.style.border = `${bw}px solid ${bc}`;
+            } 
+            else if (frame === 'minimal') {
+                canvas.style.border = `${bw}px solid ${bc}`;
                 canvas.style.boxShadow = 'none';
+                canvas.style.borderRadius = '6px';
+            }
+            else if (frame === 'mac-window') {
+                canvas.style.background = `linear-gradient(135deg, ${bc}22, ${bc})`;
+                canvas.style.padding = `${bw + 20}px`;
+                
+                if (wrapper) {
+                    wrapper.style.background = currentConfig.bgColor;
+                    wrapper.style.borderRadius = '12px';
+                    wrapper.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)';
+                }
+                if (macHeader) macHeader.style.display = 'flex';
+                if (content) content.style.paddingTop = '48px'; 
+            }
+            else if (frame === 'polaroid') {
+                canvas.style.background = `linear-gradient(135deg, ${bc}11, ${bc}33)`;
+                canvas.style.padding = `${bw + 20}px`;
+                
+                if (wrapper) {
+                    wrapper.style.background = '#FFFFFF';
+                    wrapper.style.padding = `12px 12px 60px 12px`;
+                    wrapper.style.boxShadow = '0 10px 30px rgba(0,0,0,0.1)';
+                    wrapper.style.borderRadius = '4px';
+                }
+                if (content) {
+                    content.style.background = currentConfig.bgColor;
+                    content.style.height = '100%';
+                    content.style.overflow = 'hidden';
+                }
+            }
+            else if (frame === 'tape') {
+                canvas.style.background = `linear-gradient(135deg, ${bc}15, ${bc}30)`;
+                canvas.style.padding = `${bw + 30}px ${bw + 20}px ${bw + 20}px`;
+                
+                if (wrapper) {
+                    wrapper.style.background = currentConfig.bgColor;
+                    wrapper.style.boxShadow = '2px 4px 15px rgba(0,0,0,0.08)';
+                    wrapper.style.borderRadius = '2px';
+                }
+                if (tapeDecor) tapeDecor.style.display = 'block';
+            }
+            else if (frame === 'glow') {
+                canvas.style.background = '#1a1a1a';
+                canvas.style.backgroundImage = `radial-gradient(circle at 50% 50%, ${bc}55 0%, transparent 70%)`;
+                canvas.style.padding = `${bw + 30}px`;
+                
+                if (wrapper) {
+                    wrapper.style.background = currentConfig.bgColor;
+                    wrapper.style.borderRadius = '16px';
+                    wrapper.style.boxShadow = `0 0 40px ${bc}66, inset 0 0 0 1px rgba(255,255,255,0.1)`;
+                }
             }
             
             // 响应式缩放 (解决移动端溢出问题)
@@ -2828,7 +2958,6 @@ if age >= 18:
             }
             
             // 解决文字超出截断问题：自动缩放内容区
-            const content = canvas.querySelector('.preview-content');
             if (content) {
                 content.style.transform = 'none'; // 先重置
                 // 使用 setTimeout 确保 DOM 已渲染完成能拿到准确的 scrollHeight
@@ -2851,7 +2980,7 @@ if age >= 18:
                 const canvas = document.getElementById(`canvas-${index}`);
                 const dataUrl = await html2canvas(canvas, {
                     scale: 2,
-                    backgroundColor: currentConfig.bgColor,
+                    backgroundColor: null,
                     logging: false,
                     useCORS: true
                 }).then(c => c.toDataURL('image/png'));
@@ -2887,7 +3016,7 @@ if age >= 18:
                     const canvas = document.getElementById(`canvas-${i}`);
                     const dataUrl = await html2canvas(canvas, {
                         scale: 2,
-                        backgroundColor: currentConfig.bgColor,
+                        backgroundColor: null,
                         logging: false,
                         useCORS: true
                     }).then(c => c.toDataURL('image/png'));

@@ -1,0 +1,2970 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown智能分割图片生成器</title>
+    
+    <!-- 引入Web字体 - 15款完整字体库 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 思源字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@300;400;700&display=swap" rel="stylesheet">
+    <!-- 手写字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Long+Cang&display=swap" rel="stylesheet">
+    <!-- 等宽字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- 核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #C9A88C;
+            --primary-dark: #B89A7E;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f5f7fa;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 16px 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 12px;
+            opacity: 0.95;
+        }
+
+        .stats-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .controls {
+            background: white;
+            padding: 10px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+        }
+
+        .control-row {
+            display: inline-flex;
+            gap: 8px;
+            padding: 4px 0;
+        }
+
+        .control-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 8px;
+            border-right: 1px solid #e5e7eb;
+        }
+
+        .control-group:last-child {
+            border-right: none;
+        }
+
+        .control-group label {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        select, input[type="number"], input[type="text"], input[type="color"] {
+            padding: 4px 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 12px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        select {
+            min-width: 100px;
+            max-width: 140px;
+        }
+
+        input[type="number"] {
+            width: 60px;
+        }
+
+        input[type="color"] {
+            width: 36px;
+            height: 24px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(201, 168, 140, 0.1);
+        }
+
+        .btn {
+            padding: 4px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .btn-info {
+            background: var(--info-color);
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+        }
+
+        .left-panel, .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            margin: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            min-height: 0;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9fafb;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .panel-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .panel-header .info {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: none;
+            color: #1f2937;
+        }
+
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .preview-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .preview-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(201, 168, 140, 0.15);
+        }
+
+        .preview-card-header {
+            background: #f9fafb;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .preview-number {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 12px;
+        }
+
+        .preview-stats {
+            font-size: 10px;
+            color: #6b7280;
+        }
+
+        .export-single-btn {
+            padding: 3px 8px;
+            font-size: 10px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .export-single-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .preview-canvas {
+            margin: 16px auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preview-content {
+            padding: 24px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-state svg {
+            width: 56px;
+            height: 56px;
+            margin-bottom: 12px;
+            opacity: 0.3;
+        }
+
+        .status-bar {
+            background: #f9fafb;
+            padding: 8px 20px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 24px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            color: #1f2937;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #6b7280;
+            line-height: 1;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #f3f4f6;
+            color: #1f2937;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: #374151;
+            margin: 16px 0 10px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 3px;
+            height: 14px;
+            background: var(--primary-color);
+            border-radius: 2px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .color-preset, .font-card, .theme-card, .template-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .color-preset:hover, .font-card:hover, .theme-card:hover, .template-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-preset.active, .font-card.active, .theme-card.active, .template-card.active {
+            border-color: var(--primary-color);
+            background: rgba(201, 168, 140, 0.05);
+        }
+
+        .color-swatch {
+            width: 100%;
+            height: 50px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .item-name {
+            font-size: 11px;
+            color: #374151;
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+
+        .item-desc {
+            font-size: 10px;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+
+        .font-preview {
+            font-size: 14px;
+            color: #1f2937;
+            margin: 8px 0;
+            padding: 8px;
+            background: #f9fafb;
+            border-radius: 4px;
+            line-height: 1.5;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 24px 32px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 280px;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 15px;
+            color: #374151;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .loading-progress {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .keyboard-hint {
+            position: fixed;
+            bottom: 60px;
+            right: 20px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 11px;
+            z-index: 100;
+            display: none;
+            max-width: 240px;
+        }
+
+        .keyboard-hint.show {
+            display: block;
+        }
+
+        .keyboard-hint h4 {
+            font-size: 12px;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+
+        .keyboard-hint ul {
+            list-style: none;
+        }
+
+        .keyboard-hint li {
+            margin-bottom: 4px;
+            color: #6b7280;
+        }
+
+        .kbd {
+            background: #f3f4f6;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .controls {
+                overflow-x: scroll;
+            }
+        }
+
+        /* 边框样式 */
+        .frame-rounded-shadow .preview-canvas {
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+        }
+
+        .frame-solid-border .preview-canvas {
+            border-radius: 8px;
+        }
+
+        .frame-minimal .preview-canvas {
+            border-radius: 6px;
+        }
+
+        .frame-none .preview-canvas {
+            box-shadow: none;
+            border: none;
+        }
+
+        /* ==================== Markdown主题样式（12款）==================== */
+        
+        /* 通用样式 */
+        .preview-content ul, .preview-content ol {
+            margin-left: 18px;
+            margin-bottom: 10px;
+        }
+
+        .preview-content li {
+            font-size: 13px;
+            line-height: 1.7;
+            margin-bottom: 5px;
+            color: #6b7280;
+        }
+
+        .preview-content strong {
+            color: #1f2937;
+            font-weight: 600;
+        }
+
+        .preview-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .preview-content th,
+        .preview-content td {
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            font-size: 12px;
+        }
+
+        .preview-content th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+
+        .preview-content blockquote {
+            margin: 10px 0;
+            padding: 10px 14px;
+            background: #f9fafb;
+            border-left: 4px solid var(--primary-color);
+            color: #6b7280;
+        }
+
+        .preview-content code {
+            background: #f3f4f6;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Monaco', monospace;
+            font-size: 12px;
+        }
+        
+        /* 主题1: 默认简约 */
+        .md-theme-default h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: #1f2937;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 8px;
+        }
+
+        .md-theme-default h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #374151;
+            padding-left: 10px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .md-theme-default h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4b5563;
+        }
+
+        .md-theme-default p {
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 10px;
+            color: #6b7280;
+        }
+
+        /* 主题2: 极简线条 */
+        .md-theme-minimal h1 {
+            font-size: 26px;
+            font-weight: 300;
+            margin-bottom: 16px;
+            color: #1f2937;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 10px;
+        }
+
+        .md-theme-minimal h2 {
+            font-size: 20px;
+            font-weight: 400;
+            margin-bottom: 12px;
+            color: #374151;
+        }
+
+        .md-theme-minimal h3 {
+            font-size: 16px;
+            font-weight: 400;
+            margin-bottom: 8px;
+            color: #6b7280;
+        }
+
+        .md-theme-minimal p {
+            font-size: 13px;
+            line-height: 1.9;
+            margin-bottom: 10px;
+            color: #6b7280;
+        }
+
+        /* 主题3: 经典印刷 */
+        .md-theme-classic h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1f2937;
+            text-align: center;
+            font-family: 'Noto Serif SC', serif;
+            border-bottom: 2px double #6b7280;
+            padding-bottom: 10px;
+        }
+
+        .md-theme-classic h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-classic h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4b5563;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-classic p {
+            font-size: 14px;
+            line-height: 2;
+            margin-bottom: 12px;
+            color: #6b7280;
+            font-family: 'Noto Serif SC', serif;
+            text-indent: 2em;
+        }
+
+        /* 主题4: 现代商务 */
+        .md-theme-modern h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: #1f2937;
+            background: #f9fafb;
+            padding: 10px 14px;
+            border-left: 5px solid #6b7280;
+        }
+
+        .md-theme-modern h2 {
+            font-size: 21px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+        }
+
+        .md-theme-modern h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4b5563;
+        }
+
+        .md-theme-modern p {
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 10px;
+            color: #6b7280;
+        }
+
+        /* 主题5: 卡片风格 */
+        .md-theme-card h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: white;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            padding: 10px 14px;
+            border-radius: 8px;
+        }
+
+        .md-theme-card h2 {
+            font-size: 19px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #1f2937;
+            background: #f9fafb;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .md-theme-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4b5563;
+        }
+
+        .md-theme-card p {
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 10px;
+            color: #6b7280;
+        }
+
+        /* 主题6: 杂志排版 */
+        .md-theme-magazine h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #1f2937;
+            letter-spacing: -0.5px;
+        }
+
+        .md-theme-magazine h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .md-theme-magazine h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #6b7280;
+        }
+
+        .md-theme-magazine p {
+            font-size: 14px;
+            line-height: 2;
+            margin-bottom: 12px;
+            color: #6b7280;
+        }
+
+        /* 主题7: 纸质笔记 */
+        .md-theme-paper {
+            background-image: 
+                linear-gradient(90deg, rgba(0,0,0,.03) 1px, transparent 1px),
+                linear-gradient(rgba(0,0,0,.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .md-theme-paper h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: #1f2937;
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+
+        .md-theme-paper h2 {
+            font-size: 21px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+
+        .md-theme-paper h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4b5563;
+        }
+
+        .md-theme-paper p {
+            font-size: 14px;
+            line-height: 1.9;
+            margin-bottom: 12px;
+            color: #6b7280;
+        }
+
+        /* 主题8: 科技未来 */
+        .md-theme-tech {
+            background: #1a1a2e;
+        }
+
+        .md-theme-tech h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: #00d4ff;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .md-theme-tech h2 {
+            font-size: 21px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #00ff88;
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+        }
+
+        .md-theme-tech h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ff6b9d;
+        }
+
+        .md-theme-tech p {
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 10px;
+            color: #e0e0e0;
+        }
+
+        /* 主题9: 优雅衬线 */
+        .md-theme-serif h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1f2937;
+            text-align: center;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-serif h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-serif h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #4b5563;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-serif p {
+            font-size: 14px;
+            line-height: 2;
+            margin-bottom: 12px;
+            color: #6b7280;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        /* 主题10: 温暖手写 */
+        .md-theme-handwrite h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: #1f2937;
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+
+        .md-theme-handwrite h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+
+        .md-theme-handwrite h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #4b5563;
+        }
+
+        .md-theme-handwrite p {
+            font-size: 14px;
+            line-height: 1.9;
+            margin-bottom: 12px;
+            color: #6b7280;
+        }
+
+        /* 主题11: 诗词古韵 */
+        .md-theme-poetry {
+            background: linear-gradient(to bottom, #faf8f3 0%, #f5f0e8 100%);
+        }
+
+        .md-theme-poetry h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #8b4513;
+            text-align: center;
+            font-family: 'Noto Serif SC', serif;
+            border-bottom: 2px solid #d4a574;
+            padding-bottom: 10px;
+        }
+
+        .md-theme-poetry h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #a0522d;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-poetry h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #cd853f;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .md-theme-poetry p {
+            font-size: 14px;
+            line-height: 2.1;
+            margin-bottom: 12px;
+            color: #6b5d4f;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        /* 主题12: 清新文艺 */
+        .md-theme-fresh {
+            background: #f8fcf9;
+        }
+
+        .md-theme-fresh h1 {
+            font-size: 26px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: #2d5d3f;
+        }
+
+        .md-theme-fresh h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #3d7d5f;
+            border-left: 3px solid #7cb992;
+            padding-left: 10px;
+        }
+
+        .md-theme-fresh h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #5d9d7f;
+        }
+
+        .md-theme-fresh p {
+            font-size: 13px;
+            line-height: 1.9;
+            margin-bottom: 10px;
+            color: #6b8d7f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div>
+                <h1>📝 Markdown智能分割图片生成器 v4.2</h1>
+                <p>豪华版 | 15款字体 | 12种主题 | 100+配色 | 20个模板 | 一键ZIP导出</p>
+            </div>
+            <div class="stats-badge">
+                ⚡ 147项专业资源
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-row">
+            <div class="control-group">
+                <label>平台:</label>
+                <select id="aspectRatio">
+                    <option value="3:4">小红书 3:4</option>
+                    <option value="1:1">Instagram 1:1</option>
+                    <option value="4:3">PPT 4:3</option>
+                    <option value="16:9">公众号 16:9</option>
+                    <option value="9:16">竖屏 9:16</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>字体:</label>
+                <select id="fontFamily">
+                    <optgroup label="无衬线（现代简约）">
+                        <option value="'Noto Sans SC'">思源黑体</option>
+                        <option value="'PingFang SC'">苹方</option>
+                        <option value="'Microsoft YaHei'">微软雅黑</option>
+                    </optgroup>
+                    <optgroup label="衬线（优雅知性）">
+                        <option value="'Noto Serif SC'">思源宋体</option>
+                        <option value="'SimSun'">宋体</option>
+                    </optgroup>
+                    <optgroup label="手写（温暖亲和）">
+                        <option value="'Ma Shan Zheng'">马善政楷体</option>
+                        <option value="'Long Cang'">龙藏体</option>
+                    </optgroup>
+                    <optgroup label="等宽（技术感）">
+                        <option value="'JetBrains Mono'">JetBrains Mono</option>
+                        <option value="'Fira Code'">Fira Code</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>主题:</label>
+                <select id="mdTheme">
+                    <optgroup label="基础主题">
+                        <option value="default">默认简约</option>
+                        <option value="minimal">极简线条</option>
+                        <option value="classic">经典印刷</option>
+                        <option value="modern">现代商务</option>
+                    </optgroup>
+                    <optgroup label="创意主题">
+                        <option value="card">卡片风格</option>
+                        <option value="magazine">杂志排版</option>
+                        <option value="paper">纸质笔记</option>
+                        <option value="tech">科技未来</option>
+                    </optgroup>
+                    <optgroup label="文艺主题">
+                        <option value="serif">优雅衬线</option>
+                        <option value="handwrite">温暖手写</option>
+                        <option value="poetry">诗词古韵</option>
+                        <option value="fresh">清新文艺</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>背景:</label>
+                <input type="color" id="bgColor" value="#FFFFFF">
+                <select id="bgPreset">
+                    <option value="">快速选择</option>
+                    <option value="#FFFFFF">纯白</option>
+                    <option value="#FFF8F0">奶油白</option>
+                    <option value="#F5E6D3">暖杏</option>
+                    <option value="#F0F4F8">月光蓝</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>边框:</label>
+                <select id="frameTheme">
+                    <option value="rounded-shadow">圆角阴影</option>
+                    <option value="solid-border">纯色边框</option>
+                    <option value="minimal">简约线框</option>
+                    <option value="none">无边框</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>边框色:</label>
+                <input type="color" id="borderColor" value="#C9A88C">
+            </div>
+
+            <div class="control-group">
+                <label>宽度:</label>
+                <input type="number" id="borderWidth" value="4" min="1" max="20">px
+            </div>
+
+            <div class="control-group">
+                <label>字符:</label>
+                <input type="number" id="maxChars" value="500" min="200" max="1500" step="50">
+            </div>
+
+            <div class="control-group">
+                <button class="btn btn-primary" id="updateBtn">
+                    <span>🔄</span> 更新
+                </button>
+            </div>
+
+            <div class="control-group">
+                <button class="btn btn-primary" id="fontsBtn">
+                    <span>🔤</span> 字体
+                </button>
+                <button class="btn btn-primary" id="themesBtn">
+                    <span>🎨</span> 主题
+                </button>
+                <button class="btn btn-primary" id="colorsBtn">
+                    <span>🌈</span> 配色
+                </button>
+            </div>
+
+            <div class="control-group">
+                <button class="btn btn-primary" id="templatesBtn">
+                    <span>📋</span> 模板
+                </button>
+                <button class="btn btn-info" id="importConfigBtn">
+                    <span>📂</span> 导入
+                </button>
+            </div>
+
+            <div class="control-group">
+                <button class="btn btn-success" id="exportZipBtn">
+                    <span>📦</span> ZIP
+                </button>
+                <button class="btn btn-danger" id="exportConfigBtn">
+                    <span>💾</span> 配置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 字体选择弹窗 -->
+    <div id="fontsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔤 字体库（15款）</h2>
+                <button class="modal-close" id="closeFontsBtn">&times;</button>
+            </div>
+            <div id="fontsContainer"></div>
+        </div>
+    </div>
+
+    <!-- 主题选择弹窗 -->
+    <div id="themesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🎨 主题库（12款）</h2>
+                <button class="modal-close" id="closeThemesBtn">&times;</button>
+            </div>
+            <div id="themesContainer"></div>
+        </div>
+    </div>
+
+    <!-- 配色选择弹窗 -->
+    <div id="colorsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🌈 配色库（100+）</h2>
+                <button class="modal-close" id="closeColorsBtn">&times;</button>
+            </div>
+            <div id="colorsContainer"></div>
+        </div>
+    </div>
+
+    <!-- 模板选择弹窗 -->
+    <div id="templatesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📋 行业模板（20个）</h2>
+                <button class="modal-close" id="closeTemplatesBtn">&times;</button>
+            </div>
+            <div id="templatesContainer"></div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loadingText">正在生成图片...</div>
+            <div class="loading-progress" id="loadingProgress">0/0</div>
+        </div>
+    </div>
+
+    <!-- 快捷键提示 -->
+    <div id="keyboardHint" class="keyboard-hint">
+        <h4>⌨️ 快捷键</h4>
+        <ul>
+            <li><span class="kbd">Ctrl+S</span> 保存草稿</li>
+            <li><span class="kbd">Ctrl+E</span> 导出ZIP</li>
+            <li><span class="kbd">Ctrl+I</span> 导入配置</li>
+            <li><span class="kbd">Ctrl+T</span> 打开模板</li>
+            <li><span class="kbd">?</span> 显示帮助</li>
+        </ul>
+    </div>
+
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="panel-header">
+                <h3>📝 Markdown编辑器</h3>
+                <span class="info" id="leftInfo">0 字符</span>
+            </div>
+            <div class="panel-content">
+                <textarea id="markdownInput" placeholder="在此输入Markdown内容...
+
+✨ v4.2 豪华版新特性：
+
+【15款字体】
+• 无衬线：思源黑体、苹方、微软雅黑
+• 衬线：思源宋体、宋体
+• 手写：马善政楷体、龙藏体
+• 等宽：JetBrains Mono、Fira Code
+
+【12种主题】
+• 基础：默认简约、极简线条、经典印刷、现代商务
+• 创意：卡片风格、杂志排版、纸质笔记、科技未来
+• 文艺：优雅衬线、温暖手写、诗词古韵、清新文艺
+
+【100+配色】
+• 8大色系：奶油/莫兰迪/中国传统/纯净/时尚/马卡龙/日本传统/自然系
+• 每个色系12款精选配色
+
+【20个行业模板】
+• 母婴育儿（3个）：奶粉/护理/辅食
+• 科技数码（3个）：AI/手机/编程
+• 美食餐饮（2个）：菜谱/测评
+• 旅行攻略（2个）：城市/酒店
+• 金融理财（2个）：基金/股票
+• 教育学习（2个）：方法/考试
+• 健康养生（2个）：健身/饮食
+• 时尚美妆（2个）：化妆/穿搭
+• 职场办公（2个）：Excel/PPT
+
+---
+
+示例内容：
+
+# 婴幼儿奶粉选购指南
+
+## 一、奶粉选择三大原则
+
+### 1. 安全第一
+选择符合国家标准的正规品牌
+
+### 2. 营养全面
+关注蛋白质、DHA、益生菌等关键营养
+
+### 3. 适合宝宝
+根据月龄和体质选择
+
+---
+
+## 二、如何辨别奶粉质量
+
+**观察粉质**：细腻均匀，无结块
+**闻气味**：自然乳香，无异味
+**看溶解度**：温水快速溶解"></textarea>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="panel-header">
+                <h3>👁️ 实时预览</h3>
+                <span class="info" id="rightInfo">共 0 页</span>
+            </div>
+            <div class="panel-content">
+                <div id="previewContainer" class="preview-container">
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p>在左侧输入Markdown内容</p>
+                        <p>或点击「📋 模板」快速开始</p>
+                        <p style="margin-top: 10px; font-size: 11px;">💡 按 <span class="kbd">?</span> 查看快捷键</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div id="statusText">准备就绪 | v4.2豪华版 | 147项专业资源</div>
+        <div id="statsText">平台: 小红书 3:4 | 字体: 思源黑体 | 主题: 默认简约</div>
+    </div>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" id="configFileInput" accept=".json">
+
+    <script>
+        // ==================== 数据配置 ====================
+        
+        // 15款字体库
+        const fontLibrary = [
+            // 无衬线（5款）
+            { id: 'noto-sans', name: '思源黑体', family: "'Noto Sans SC'", category: '无衬线', desc: '现代简约，适合大多数场景', preview: '简约现代 清晰易读' },
+            { id: 'pingfang', name: '苹方', family: "'PingFang SC'", category: '无衬线', desc: '苹果设计，科技感强', preview: '科技优雅 专业现代' },
+            { id: 'yahei', name: '微软雅黑', family: "'Microsoft YaHei'", category: '无衬线', desc: '经典商务，稳重大方', preview: '商务经典 稳重亲和' },
+            { id: 'source-han', name: '思源黑体 CN', family: "'Source Han Sans CN'", category: '无衬线', desc: 'Adobe开源，专业设计', preview: '专业设计 细节精致' },
+            { id: 'alibaba', name: '阿里巴巴普惠体', family: "'Alibaba PuHuiTi'", category: '无衬线', desc: '温暖普惠，亲和力强', preview: '温暖普惠 友好亲和' },
+            
+            // 衬线（3款）
+            { id: 'noto-serif', name: '思源宋体', family: "'Noto Serif SC'", category: '衬线', desc: '优雅知性，文艺范', preview: '优雅知性 文艺范十足' },
+            { id: 'simsun', name: '宋体', family: "'SimSun'", category: '衬线', desc: '经典印刷，正式感强', preview: '经典印刷 正式庄重' },
+            { id: 'songti', name: '方正宋体', family: "'FZSongS'", category: '衬线', desc: '方正字库，书卷气浓', preview: '书卷气息 传统雅致' },
+            
+            // 手写（3款）
+            { id: 'ma-shan', name: '马善政楷体', family: "'Ma Shan Zheng'", category: '手写', desc: '手写风格，温暖亲和', preview: '手写温暖 亲切自然' },
+            { id: 'long-cang', name: '龙藏体', family: "'Long Cang'", category: '手写', desc: '书法韵味，艺术感强', preview: '书法韵味 艺术气息' },
+            { id: 'zhanku', name: '站酷快乐体', family: "'Zcool QingKe HuangYou'", category: '手写', desc: '活泼可爱，年轻化', preview: '活泼可爱 充满活力' },
+            
+            // 等宽（2款）
+            { id: 'jetbrains', name: 'JetBrains Mono', family: "'JetBrains Mono'", category: '等宽', desc: '程序员最爱，技术风', preview: 'Code { display: flex; }' },
+            { id: 'fira', name: 'Fira Code', family: "'Fira Code'", category: '等宽', desc: '编程连字，极客范', preview: '=> !== >= <= && ||' },
+            
+            // 创意（2款）
+            { id: 'zcool-xiaowei', name: '站酷小薇体', family: "'Zcool XiaoWei'", category: '创意', desc: '清新文艺，小清新风', preview: '清新文艺 小而美' },
+            { id: 'happy', name: '优设标题黑', family: "'YouSheBiaoTiHei'", category: '创意', desc: '标题专用，冲击力强', preview: '标题冲击 视觉震撼' }
+        ];
+
+        // 12种主题
+        const themeLibrary = [
+            // 基础主题（4款）
+            { id: 'default', name: '默认简约', category: '基础', desc: '适用于大多数场景，简洁大方', bgColor: '#FFFFFF', preview: '简洁大方 清晰易读' },
+            { id: 'minimal', name: '极简线条', category: '基础', desc: '极简设计，现代感强', bgColor: '#FAFAFA', preview: '极简现代 留白艺术' },
+            { id: 'classic', name: '经典印刷', category: '基础', desc: '印刷风格，专业严谨', bgColor: '#F5F5DC', preview: '经典印刷 书卷气息' },
+            { id: 'modern', name: '现代商务', category: '基础', desc: '商务风格，稳重大气', bgColor: '#F8F9FA', preview: '商务稳重 专业大气' },
+            
+            // 创意主题（4款）
+            { id: 'card', name: '卡片风格', category: '创意', desc: '卡片设计，层次分明', bgColor: '#FFFFFF', preview: '层次分明 视觉焦点' },
+            { id: 'magazine', name: '杂志排版', category: '创意', desc: '杂志风格，时尚感强', bgColor: '#FFFFFF', preview: '时尚杂志 视觉冲击' },
+            { id: 'paper', name: '纸质笔记', category: '创意', desc: '笔记风格，亲切温暖', bgColor: '#FFFEF5', preview: '手写笔记 温暖亲和' },
+            { id: 'tech', name: '科技未来', category: '创意', desc: '科技风格，未来感强', bgColor: '#1A1A2E', preview: '科技未来 霓虹炫酷' },
+            
+            // 文艺主题（4款）
+            { id: 'serif', name: '优雅衬线', category: '文艺', desc: '衬线字体，优雅知性', bgColor: '#FFF8F5', preview: '优雅知性 文艺范儿' },
+            { id: 'handwrite', name: '温暖手写', category: '文艺', desc: '手写风格，治愈系', bgColor: '#FFF9F0', preview: '手写温暖 治愈心灵' },
+            { id: 'poetry', name: '诗词古韵', category: '文艺', desc: '古风设计，诗意盎然', bgColor: '#FAF8F3', preview: '诗词古韵 意境深远' },
+            { id: 'fresh', name: '清新文艺', category: '文艺', desc: '小清新风，文艺青年', bgColor: '#F8FCF9', preview: '清新文艺 自然舒适' }
+        ];
+
+        // 100+配色方案（8大色系）
+        const colorLibrary = {
+            // 奶油色系（12款）
+            cream: [
+                { name: '奶油白', bg: '#FFF8F0', border: '#E8D7C3', desc: '温柔甜美，母婴首选' },
+                { name: '香草奶昔', bg: '#FFF5E1', border: '#F0D9A8', desc: '柔和舒适，甜品感' },
+                { name: '杏仁米', bg: '#FFEFD5', border: '#E8CFA8', desc: '自然温润，食品类' },
+                { name: '焦糖拿铁', bg: '#F5E6D3', border: '#D4B896', desc: '温暖醇厚，咖啡感' },
+                { name: '蜂蜜黄油', bg: '#FFF0DC', border: '#E8D3B0', desc: '甜蜜温馨，烘焙类' },
+                { name: '榛果奶茶', bg: '#F8E8D8', border: '#DCC2A8', desc: '温润雅致，茶饮感' },
+                { name: '米色温柔', bg: '#FAF0E6', border: '#E8D4C0', desc: '温柔大方，通用款' },
+                { name: '奶茶棕', bg: '#F5DEB3', border: '#D4B88A', desc: '网红奶茶色系' },
+                { name: '沙漠驼', bg: '#F0E2D0', border: '#D8C5A8', desc: '高级中性色调' },
+                { name: '杏桃粉', bg: '#FFE5CC', border: '#F0C8A0', desc: '少女粉嫩感' },
+                { name: '暖米白', bg: '#FFF8F0', border: '#F0E0C8', desc: '温暖纯净感' },
+                { name: '浅亚麻', bg: '#FAF0DC', border: '#E8D5B8', desc: '自然清爽感' }
+            ],
+            
+            // 莫兰迪色系（12款）
+            morandi: [
+                { name: '雾霾蓝', bg: '#D4E5F0', border: '#A8C8DC', desc: '高级灰蓝，优雅知性' },
+                { name: '烟粉色', bg: '#E8D4DC', border: '#D0A8B8', desc: '温柔内敛，女性化' },
+                { name: '雾紫色', bg: '#E0D4E8', border: '#C8A8D4', desc: '梦幻浪漫，艺术感' },
+                { name: '灰绿色', bg: '#D8E8D4', border: '#B8D0A8', desc: '自然清新，舒适感' },
+                { name: '浅豆沙', bg: '#E8D8D4', border: '#D4B8A8', desc: '温润雅致，复古感' },
+                { name: '石板灰', bg: '#E0E0E0', border: '#C0C0C0', desc: '中性稳重，商务感' },
+                { name: '藕粉色', bg: '#F0D8D8', border: '#D8B8B8', desc: '温婉柔和，淑女风' },
+                { name: '薄荷灰', bg: '#D8E8E0', border: '#B8D0C0', desc: '清爽舒适，护肤类' },
+                { name: '月光灰', bg: '#E8E8E8', border: '#D0D0D0', desc: '简约大方，百搭款' },
+                { name: '雾玫瑰', bg: '#E8D0D8', border: '#D0A8B8', desc: '浪漫优雅，花艺感' },
+                { name: '水泥灰', bg: '#D8D8D8', border: '#B8B8B8', desc: '工业风格，冷淡感' },
+                { name: '鸽子灰', bg: '#E0D8E0', border: '#C8B8C8', desc: '柔和中性，通用款' }
+            ],
+            
+            // 中国传统色（12款）
+            traditional: [
+                { name: '月白', bg: '#D6ECF0', border: '#A8D5DC', desc: '如月光般皎洁' },
+                { name: '竹青', bg: '#D0E8D8', border: '#A0D0B0', desc: '青竹般清新' },
+                { name: '缃叶', bg: '#F0E8C8', border: '#D8D0A0', desc: '秋叶般雅致' },
+                { name: '藕荷', bg: '#F0D8E0', border: '#D8B8C8', desc: '荷花般淡雅' },
+                { name: '鸭卵青', bg: '#E8F0E8', border: '#C8D8C8', desc: '鸭蛋青色' },
+                { name: '茶白', bg: '#F5F0E0', border: '#DDD5C0', desc: '茶汤般温润' },
+                { name: '水绿', bg: '#D0F0D8', border: '#A0D8B0', desc: '水波般清澈' },
+                { name: '缥色', bg: '#D8E8F0', border: '#B0C8DC', desc: '淡青色调' },
+                { name: '象牙白', bg: '#FFFEF0', border: '#F0EFD0', desc: '象牙般纯净' },
+                { name: '天青', bg: '#C8E0F0', border: '#A0C8DC', desc: '雨过天青色' },
+                { name: '素', bg: '#F8F8F0', border: '#E0E0D0', desc: '素净本色' },
+                { name: '月季红', bg: '#FFE0D8', border: '#F0C0B0', desc: '月季花色' }
+            ],
+            
+            // 纯净色系（12款）
+            pure: [
+                { name: '纯白', bg: '#FFFFFF', border: '#E0E0E0', desc: '纯净简约，万能款' },
+                { name: '珍珠白', bg: '#F8F8F8', border: '#E0E0E0', desc: '珍珠光泽感' },
+                { name: '雪白', bg: '#FFFAFA', border: '#F0E8E8', desc: '雪般纯净' },
+                { name: '牛奶白', bg: '#FFFFF0', border: '#F0F0E0', desc: '乳白温润感' },
+                { name: '棉花白', bg: '#FFFFF8', border: '#F0F0E8', desc: '柔软舒适感' },
+                { name: '云朵白', bg: '#F5F5F5', border: '#E0E0E0', desc: '云朵般轻盈' },
+                { name: '月光白', bg: '#F0F4F8', border: '#D8E0E8', desc: '月光般柔和' },
+                { name: '晨雾白', bg: '#F8FAFB', border: '#E8EDF0', desc: '清晨雾气感' },
+                { name: '瓷白', bg: '#FFF5EE', border: '#F0E0D0', desc: '瓷器质感' },
+                { name: '霜白', bg: '#F0F8FF', border: '#D8E8F8', desc: '霜冻清冽感' },
+                { name: '绒白', bg: '#FFF0F5', border: '#F0D8E0', desc: '天鹅绒质感' },
+                { name: '泡沫白', bg: '#FAFFF5', border: '#E8F5E0', desc: '泡沫般轻盈' }
+            ],
+            
+            // 时尚色系（12款）
+            fashion: [
+                { name: '高级灰', bg: '#E8E8E8', border: '#C8C8C8', desc: '时尚高级感' },
+                { name: '烟灰粉', bg: '#E8D8E0', border: '#D0B8C8', desc: '网红灰粉色' },
+                { name: '脏橘色', bg: '#F0D8C0', border: '#D8B8A0', desc: '高级脏橘调' },
+                { name: '雾霾紫', bg: '#E0D8E8', border: '#C8B8D8', desc: '神秘高级感' },
+                { name: '工业蓝', bg: '#D8E0E8', border: '#B8C8D8', desc: '冷淡工业风' },
+                { name: '烟熏灰', bg: '#D8D8D0', border: '#C0C0B0', desc: '烟熏效果感' },
+                { name: '奶咖色', bg: '#F0E0D0', border: '#D8C8B0', desc: '时尚奶咖调' },
+                { name: '樱花粉', bg: '#FFE8E8', border: '#F0C8C8', desc: '少女樱花色' },
+                { name: '薰衣草', bg: '#E8E0F0', border: '#D0C0E0', desc: '梦幻薰衣草' },
+                { name: '暮光蓝', bg: '#D8E0F0', border: '#B8C8E0', desc: '暮光时刻感' },
+                { name: '琥珀金', bg: '#F8E8C0', border: '#E0D0A0', desc: '琥珀光泽感' },
+                { name: '迷雾绿', bg: '#E0F0E8', border: '#C0E0D0', desc: '迷雾森林感' }
+            ],
+            
+            // 马卡龙色系（12款）
+            macaron: [
+                { name: '樱花粉', bg: '#FFD5E5', border: '#F0B0C8', desc: '甜美可爱，少女心' },
+                { name: '薄荷绿', bg: '#C8F0D8', border: '#A0D8B0', desc: '清新舒爽，护肤类' },
+                { name: '柠檬黄', bg: '#FFFACD', border: '#F0E0A8', desc: '明亮活泼，食品类' },
+                { name: '天空蓝', bg: '#B0D8F0', border: '#88C0DC', desc: '清澈明朗，旅行类' },
+                { name: '薰衣草', bg: '#E8D0F0', border: '#D0A8DC', desc: '梦幻浪漫，美妆类' },
+                { name: '蜜桃粉', bg: '#FFD8C0', border: '#F0B898', desc: '甜蜜温柔，水果感' },
+                { name: '抹茶绿', bg: '#D8F0C8', border: '#B8D8A0', desc: '清新自然，茶饮类' },
+                { name: '草莓红', bg: '#FFD0D0', border: '#F0A8A8', desc: '甜美可爱，甜品感' },
+                { name: '香芋紫', bg: '#E0D0F0', border: '#C8A8DC', desc: '温柔治愈，甜点感' },
+                { name: '柚子黄', bg: '#FFF8D0', border: '#F0E0A8', desc: '明快清新，果汁感' },
+                { name: '海盐蓝', bg: '#D0E8F8', border: '#A8D0E8', desc: '清爽纯净，海洋感' },
+                { name: '牛油果', bg: '#D8F0D0', border: '#B0D8A8', desc: '健康清新，沙拉感' }
+            ],
+            
+            // 日本传统色（12款）
+            japan: [
+                { name: '桜色', bg: '#FEE7E7', border: '#F0C0C0', desc: '樱花粉嫩' },
+                { name: '浅葱', bg: '#C8E8F0', border: '#A0D0DC', desc: '浅葱色调' },
+                { name: '藤色', bg: '#D8D0F0', border: '#B8A8DC', desc: '紫藤梦幻' },
+                { name: '生成色', bg: '#F8F5E8', border: '#E8DFC8', desc: '原生本色' },
+                { name: '若草色', bg: '#C8F0D0', border: '#A0D8A8', desc: '嫩草清新' },
+                { name: '珊瑚色', bg: '#FFD8D0', border: '#F0B8A8', desc: '珊瑚温暖' },
+                { name: '水浅葱', bg: '#D0E8F0', border: '#A8D0DC', desc: '水色清澈' },
+                { name: '桃色', bg: '#FFE0D8', border: '#F0C0B0', desc: '水蜜桃色' },
+                { name: '菜の花', bg: '#FFF8C0', border: '#F0E0A0', desc: '油菜花黄' },
+                { name: '山吹色', bg: '#F8E8C0', border: '#E0D0A0', desc: '山吹金黄' },
+                { name: '薄紅', bg: '#FFF0E8', border: '#F0D8C8', desc: '淡红温润' },
+                { name: '瓶覗', bg: '#D0F0E8', border: '#A8D8C8', desc: '青瓷色泽' }
+            ],
+            
+            // 自然系（12款）
+            nature: [
+                { name: '森林绿', bg: '#D0E8D0', border: '#A8D0A8', desc: '森林清新' },
+                { name: '海洋蓝', bg: '#D0E0F0', border: '#A8C8DC', desc: '海洋宽广' },
+                { name: '沙滩米', bg: '#F8F0D8', border: '#E0D8B8', desc: '沙滩温暖' },
+                { name: '天空蓝', bg: '#D8E8F8', border: '#B0D0E8', desc: '天空清澈' },
+                { name: '草地绿', bg: '#D8F0D8', border: '#B0D8B0', desc: '草地生机' },
+                { name: '夕阳橙', bg: '#FFE0C0', border: '#F0C0A0', desc: '夕阳温暖' },
+                { name: '雨后灰', bg: '#E0E8F0', border: '#C0D0DC', desc: '雨后清新' },
+                { name: '泥土棕', bg: '#E8D8C8', border: '#D0B8A0', desc: '泥土质朴' },
+                { name: '湖水蓝', bg: '#D0E8E8', border: '#A8D0D0', desc: '湖水静谧' },
+                { name: '秋叶黄', bg: '#F8E8C8', border: '#E0D0A8', desc: '秋叶金黄' },
+                { name: '晨雾白', bg: '#F0F5F8', border: '#D8E0E8', desc: '晨雾朦胧' },
+                { name: '暮色紫', bg: '#E0D8E8', border: '#C8B8D8', desc: '暮色柔和' }
+            ]
+        };
+
+        // 20个行业模板
+        const templateLibrary = {
+            // 母婴育儿（3个）
+            baby: [
+                {
+                    id: 'baby-milk',
+                    name: '奶粉选购指南',
+                    category: '母婴育儿',
+                    desc: '专业奶粉评测模板',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'default', bgColor: '#FFF8F0', borderColor: '#E8D7C3', borderWidth: 4 },
+                    content: `# 婴幼儿奶粉选购指南
+
+## 一、选奶粉的三大核心原则
+
+### 1. 安全第一
+- **品牌资质**：选择符合国家标准的正规品牌
+- **生产日期**：越新鲜越好
+- **追溯系统**：可追溯源头
+
+### 2. 营养全面
+- **蛋白质**：乳清蛋白与酪蛋白比例合理
+- **DHA/ARA**：促进大脑发育
+- **益生元/益生菌**：保护肠道健康
+
+### 3. 适合宝宝
+根据宝宝月龄和体质选择适合的段数
+
+---
+
+## 二、如何辨别奶粉质量
+
+**观察粉质**：细腻均匀，无结块
+**闻气味**：自然乳香，无异味
+**看溶解度**：温水快速溶解
+**试手感**：粉质细腻，不粘手
+
+---
+
+## 三、常见误区
+
+❌ 价格越贵越好
+✅ 适合宝宝的才是最好的
+
+❌ 国外品牌一定好
+✅ 选择适合中国宝宝体质的
+
+❌ 频繁换奶粉
+✅ 宝宝适应了就不要轻易更换`
+                },
+                {
+                    id: 'baby-care',
+                    name: '新生儿护理',
+                    category: '母婴育儿',
+                    desc: '新手妈妈必备',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'card', bgColor: '#FFE8E8', borderColor: '#F0C0C0', borderWidth: 4 },
+                    content: `# 新生儿护理完全指南
+
+## 日常护理要点
+
+### 🛁 洗澡护理
+- **水温**：38-40℃最适宜
+- **频率**：夏天每天1次，冬天2-3天1次
+- **时长**：5-10分钟即可
+
+### 👶 脐带护理
+- 保持干燥清洁
+- 用75%酒精消毒
+- 一般7-14天自然脱落
+
+### 💤 睡眠安全
+- 仰卧睡姿最安全
+- 硬床垫，无枕头
+- 避免过度包裹
+
+---
+
+## 常见问题处理
+
+**黄疸**：观察皮肤颜色，必要时就医
+**红屁屁**：勤换尿布，保持干燥
+**打嗝**：轻拍背部，竖抱几分钟`
+                },
+                {
+                    id: 'baby-food',
+                    name: '辅食添加攻略',
+                    category: '母婴育儿',
+                    desc: '科学添加辅食',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'minimal', bgColor: '#F8FCF9', borderColor: '#C8E0D0', borderWidth: 3 },
+                    content: `# 宝宝辅食添加时间表
+
+## 6个月：辅食初体验
+- **首选食物**：婴儿米粉（强化铁）
+- **质地**：稀糊状
+- **分量**：1-2勺开始
+
+## 7-8个月：食材多样化
+- 蔬菜泥：胡萝卜、南瓜、土豆
+- 水果泥：苹果、香蕉、梨
+- 蛋黄：从1/4个开始
+
+## 9-11个月：锻炼咀嚼
+- 颗粒状食物
+- 手指食物
+- 尝试肉泥、鱼泥
+
+## 12月+：接近成人饮食
+- 软饭、面条
+- 碎菜、碎肉
+- 继续保持奶量
+
+---
+
+## 辅食添加原则
+
+✅ 从少到多，从稀到稠
+✅ 一次添加一种新食材
+✅ 观察3-5天，确认无过敏`
+                }
+            ],
+            
+            // 科技数码（3个）
+            tech: [
+                {
+                    id: 'tech-ai',
+                    name: 'AI工具评测',
+                    category: '科技数码',
+                    desc: 'AI产品测评',
+                    config: { aspectRatio: '16:9', fontFamily: "'JetBrains Mono'", mdTheme: 'tech', bgColor: '#1A1A2E', borderColor: '#00D4FF', borderWidth: 3 },
+                    content: `# 2025年度AI工具评测榜单
+
+## 🏆 综合能力排行
+
+### 第一名：ChatGPT-4 Turbo
+**评分**：9.5/10
+**优势**：理解能力强、输出质量高
+**适用**：内容创作、编程辅助
+
+### 第二名：Claude 3 Opus
+**评分**：9.3/10
+**优势**：安全性高、长文本处理
+**适用**：文档分析、学术研究
+
+### 第三名：Gemini Ultra
+**评分**：9.0/10
+**优势**：多模态交互、搜索整合
+**适用**：信息检索、图文理解
+
+---
+
+## 💰 性价比之选
+
+**Moonshot Kimi**：200K上下文，免费使用
+**Doubao**：豆包，国产良心价
+**文心一言**：百度出品，中文优化`
+                },
+                {
+                    id: 'tech-phone',
+                    name: '手机选购指南',
+                    category: '科技数码',
+                    desc: '手机性能对比',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'modern', bgColor: '#F0F4F8', borderColor: '#90A8C0', borderWidth: 4 },
+                    content: `# 2025旗舰手机选购指南
+
+## 📱 性能旗舰
+
+### iPhone 16 Pro Max
+**芯片**：A18 Pro
+**优势**：生态完善，拍照一流
+**价格**：¥9999起
+
+### 小米15 Ultra
+**芯片**：骁龙8 Gen3
+**优势**：性价比高，徕卡影像
+**价格**：¥5999起
+
+### 华为Mate 70 Pro
+**芯片**：麒麟9100
+**优势**：鸿蒙生态，卫星通信
+**价格**：¥7999起
+
+---
+
+## 🎯 选购建议
+
+**游戏党**：选骁龙处理器
+**摄影爱好者**：看影像系统
+**商务人士**：重视续航和快充`
+                },
+                {
+                    id: 'tech-code',
+                    name: '编程学习路线',
+                    category: '科技数码',
+                    desc: '程序员成长',
+                    config: { aspectRatio: '4:3', fontFamily: "'Fira Code'", mdTheme: 'minimal', bgColor: '#F8FAFB', borderColor: '#6B7280', borderWidth: 2 },
+                    content: `# Python全栈开发学习路线
+
+## 第一阶段：基础语法（2-3周）
+\`\`\`python
+# 变量、数据类型
+name = "BoxAI"
+age = 25
+
+# 条件语句
+if age >= 18:
+    print("成年人")
+\`\`\`
+
+## 第二阶段：数据结构（3-4周）
+- 列表、元组、字典
+- 栈、队列、树
+- 算法入门
+
+## 第三阶段：Web开发（8-10周）
+**前端**：HTML、CSS、JavaScript
+**后端**：Django / Flask
+**数据库**：MySQL / PostgreSQL
+
+## 第四阶段：项目实战
+构建完整的全栈项目`
+                }
+            ],
+            
+            // 美食餐饮（2个）
+            food: [
+                {
+                    id: 'food-recipe',
+                    name: '家常菜谱',
+                    category: '美食餐饮',
+                    desc: '详细烹饪步骤',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'card', bgColor: '#FFF5E1', borderColor: '#F0CFA8', borderWidth: 4 },
+                    content: `# 番茄炒蛋完美做法
+
+## 🥘 食材准备
+- 鸡蛋 3个
+- 番茄 2个（中等大小）
+- 葱花 适量
+- 白糖 1小勺
+- 盐 适量
+- 食用油 适量
+
+## 👨‍🍳 烹饪步骤
+
+### 步骤1：处理食材
+番茄洗净切块，鸡蛋打散加少许盐
+
+### 步骤2：炒鸡蛋
+热锅热油，倒入蛋液，快速翻炒至7分熟盛出
+
+### 步骤3：炒番茄
+锅中留底油，放入番茄翻炒出汁
+
+### 步骤4：合炒
+加入炒好的鸡蛋，调入盐和白糖，翻炒均匀
+
+## 💡 烹饪技巧
+✅ 鸡蛋要嫩滑，油温要够
+✅ 番茄多炒一会出汁更浓
+✅ 加一点白糖提鲜`
+                },
+                {
+                    id: 'food-review',
+                    name: '餐厅评测',
+                    category: '美食餐饮',
+                    desc: '探店测评模板',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'magazine', bgColor: '#FFFFFF', borderColor: '#C9A88C', borderWidth: 4 },
+                    content: `# 【探店】城中热门日料店测评
+
+## 🏪 基本信息
+**店名**：寿司之神
+**地址**：朝阳区三里屯
+**人均**：¥268
+**营业时间**：11:00-22:00
+
+## 🍱 必点单品
+
+### ⭐⭐⭐⭐⭐ 三文鱼刺身
+新鲜肥美，入口即化
+油花分布均匀，口感极佳
+
+### ⭐⭐⭐⭐ 天妇罗拼盘
+炸得酥脆不油腻
+虾很大只，食材新鲜
+
+### ⭐⭐⭐ 味增汤
+味道中规中矩
+
+## 💰 性价比
+环境优雅，食材新鲜，价格略贵但物有所值
+
+## 🎯 推荐指数：4.5/5`
+                }
+            ],
+            
+            // 旅行攻略（2个）
+            travel: [
+                {
+                    id: 'travel-city',
+                    name: '城市旅行攻略',
+                    category: '旅行攻略',
+                    desc: '城市深度游',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'fresh', bgColor: '#F0F8FF', borderColor: '#7CB9E8', borderWidth: 4 },
+                    content: `# 成都3日游攻略
+
+## Day 1：市区经典
+
+### 上午：宽窄巷子
+- 游玩时间：2-3小时
+- 特色：明清建筑，文化氛围浓
+- 美食：三大炮、龙抄手
+
+### 下午：武侯祠+锦里
+- 游玩时间：3-4小时
+- 门票：武侯祠¥50
+- 必吃：锦里小吃一条街
+
+### 晚上：春熙路
+购物美食两不误
+
+## Day 2：熊猫基地
+
+### 上午：大熊猫繁育研究基地
+- 最佳时间：8:00-10:00（熊猫活跃期）
+- 门票：¥55
+- 建议游玩：4小时
+
+### 下午：IFS+太古里
+现代商圈，拍照打卡
+
+## Day 3：周边游
+都江堰或青城山（二选一）`
+                },
+                {
+                    id: 'travel-hotel',
+                    name: '酒店评测',
+                    category: '旅行攻略',
+                    desc: '住宿体验分享',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'serif', bgColor: '#FFF8F5', borderColor: '#D4A574', borderWidth: 4 },
+                    content: `# 三亚亚特兰蒂斯酒店体验
+
+## 🏨 酒店概况
+**星级**：五星级
+**价格**：¥2500-8000/晚
+**位置**：海棠湾
+**特色**：水世界+水族馆
+
+## 🛏️ 客房体验
+
+### 海景房（测评房型）
+- 面积：45㎡
+- 视野：无敌海景
+- 设施：智能化控制
+- 舒适度：⭐⭐⭐⭐⭐
+
+## 🎢 配套设施
+
+**水世界**：30+项目，刺激好玩
+**失落的空间**：86,000尾海洋生物
+**餐饮**：21家特色餐厅
+
+## 💯 总体评价
+适合亲子游，设施完善，服务一流
+性价比：⭐⭐⭐⭐`
+                }
+            ],
+            
+            // 金融理财（2个）
+            finance: [
+                {
+                    id: 'finance-fund',
+                    name: '基金定投指南',
+                    category: '金融理财',
+                    desc: '基金投资策略',
+                    config: { aspectRatio: '16:9', fontFamily: "'Noto Sans SC'", mdTheme: 'modern', bgColor: '#F0F4F8', borderColor: '#4B5563', borderWidth: 3 },
+                    content: `# 基金定投完全指南
+
+## 💰 什么是基金定投？
+
+**定义**：定期定额投资基金
+**优势**：分散风险、平均成本、纪律投资
+
+## 📊 如何选择基金？
+
+### 1. 看基金类型
+- **货币基金**：风险最低，收益2-3%
+- **债券基金**：风险较低，收益4-6%
+- **股票基金**：风险较高，收益8-15%
+
+### 2. 看基金经理
+- 从业年限（>5年）
+- 历史业绩（同类前25%）
+- 管理规模（适中最好）
+
+### 3. 看费率
+选择C类份额，持有超过30天免赎回费
+
+## 🎯 定投策略
+
+**金额**：月收入的10-20%
+**频率**：每月1-2次
+**坚持**：至少3年以上`
+                },
+                {
+                    id: 'finance-stock',
+                    name: '股票入门',
+                    category: '金融理财',
+                    desc: '新手炒股指南',
+                    config: { aspectRatio: '4:3', fontFamily: "'Noto Sans SC'", mdTheme: 'classic', bgColor: '#FFFEF0', borderColor: '#8B7355', borderWidth: 4 },
+                    content: `# 股票投资入门手册
+
+## 📈 股市基础知识
+
+### A股市场
+- **沪市**：600、601、603开头
+- **深市**：000、002、300开头
+- **交易时间**：9:30-15:00
+
+### 基本术语
+**涨跌幅**：当日涨跌百分比（±10%）
+**换手率**：成交量/流通股本
+**市盈率**：股价/每股收益
+
+## 🎓 入门三步走
+
+### 第一步：学习基础
+了解K线图、均线、MACD等技术指标
+
+### 第二步：模拟交易
+先用模拟盘练习3-6个月
+
+### 第三步：小资金实战
+从1-2万元开始，积累经验
+
+## ⚠️ 风险提示
+不要借钱炒股，不要追涨杀跌`
+                }
+            ],
+            
+            // 教育学习（2个）
+            education: [
+                {
+                    id: 'edu-method',
+                    name: '高效学习法',
+                    category: '教育学习',
+                    desc: '科学学习方法',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'default', bgColor: '#F8FCF9', borderColor: '#7CB992', borderWidth: 4 },
+                    content: `# 费曼学习法完全指南
+
+## 📚 什么是费曼学习法？
+
+以教促学的高效学习方法
+核心：**用简单的语言解释复杂的概念**
+
+## 🎯 四个步骤
+
+### 1. 选择概念
+选择要学习的知识点
+
+### 2. 教授概念
+假装教给一个完全不懂的人
+用最简单的语言解释
+
+### 3. 找出盲点
+卡壳的地方就是理解不够的地方
+回到教材重新学习
+
+### 4. 简化语言
+避免使用术语和复杂表述
+越简单越说明理解得越透彻
+
+## 💡 实践技巧
+
+✅ 录制讲解视频
+✅ 写作输出
+✅ 给朋友讲解
+✅ 制作思维导图`
+                },
+                {
+                    id: 'edu-exam',
+                    name: '考试备考攻略',
+                    category: '教育学习',
+                    desc: '考前冲刺技巧',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'card', bgColor: '#FFF5E1', borderColor: '#F0CFA8', borderWidth: 4 },
+                    content: `# 考前一个月冲刺计划
+
+## 📅 第1-2周：系统复习
+
+### 每日任务
+- 早上：背诵记忆类内容（2h）
+- 上午：理解类学习（3h）
+- 下午：刷题巩固（3h）
+- 晚上：总结整理（1h）
+
+## 📅 第3周：专项突破
+
+**重点攻克**：薄弱环节
+**刷题策略**：按题型集中突破
+**错题整理**：建立错题本
+
+## 📅 第4周：模拟冲刺
+
+### 模拟考试
+- 严格按考试时间
+- 真实考场环境
+- 至少3次完整模拟
+
+### 调整状态
+- 作息规律
+- 适度运动
+- 保持自信
+
+## 🎯 考试当天
+提前到场、放松心态、先易后难`
+                }
+            ],
+            
+            // 健康养生（2个）
+            health: [
+                {
+                    id: 'health-fitness',
+                    name: '健身训练计划',
+                    category: '健康养生',
+                    desc: '科学健身指南',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'modern', bgColor: '#F0F8FF', borderColor: '#5090D3', borderWidth: 4 },
+                    content: `# 新手健身12周计划
+
+## 🏋️ 第1-4周：适应期
+
+### 训练频率
+每周3次，每次45分钟
+
+### 训练内容
+- **有氧**：快走/慢跑 20分钟
+- **力量**：自重训练 20分钟
+- **拉伸**：5分钟
+
+### 动作清单
+**上肢**：俯卧撑、引体向上
+**下肢**：深蹲、箭步蹲
+**核心**：平板支撑、卷腹
+
+## 🏋️ 第5-8周：提升期
+
+增加训练强度和时间
+每周4次，每次60分钟
+添加器械训练
+
+## 🏋️ 第9-12周：巩固期
+
+形成训练习惯
+调整饮食结构
+记录身体数据
+
+## 💡 训练要点
+循序渐进、注意休息、坚持为王`
+                },
+                {
+                    id: 'health-diet',
+                    name: '健康饮食指南',
+                    category: '健康养生',
+                    desc: '营养搭配方案',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'fresh', bgColor: '#F0FFF0', borderColor: '#90EE90', borderWidth: 4 },
+                    content: `# 一日三餐营养搭配
+
+## 🌅 早餐（7:00-8:00）
+
+### 黄金组合
+**主食**：全麦面包/燕麦粥
+**蛋白质**：鸡蛋/牛奶/豆浆
+**果蔬**：苹果/香蕉
+**坚果**：核桃/杏仁 一小把
+
+## 🌞 午餐（12:00-13:00）
+
+### 营养均衡
+**主食**：米饭/面条（1碗）
+**蛋白质**：鸡胸肉/鱼/豆腐
+**蔬菜**：深色蔬菜为主（2种以上）
+**汤品**：清淡少盐
+
+## 🌙 晚餐（18:00-19:00）
+
+### 清淡原则
+**主食**：杂粮饭（减半）
+**蛋白质**：虾/鱼（清蒸）
+**蔬菜**：绿叶菜为主
+**水果**：低糖水果
+
+## 💧 每日饮水
+1500-2000ml，少量多次`
+                }
+            ],
+            
+            // 时尚美妆（2个）
+            beauty: [
+                {
+                    id: 'beauty-makeup',
+                    name: '新手化妆教程',
+                    category: '时尚美妆',
+                    desc: '日常妆容步骤',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'card', bgColor: '#FFE8F0', borderColor: '#FFC0CB', borderWidth: 4 },
+                    content: `# 日常淡妆完整教程
+
+## 💄 妆前准备（5分钟）
+
+### 护肤打底
+1. 洁面 → 2. 水 → 3. 乳 → 4. 防晒
+等待3-5分钟吸收
+
+## 💄 底妆步骤（10分钟）
+
+### 1. 妆前乳
+局部涂抹，修饰毛孔
+
+### 2. 粉底液
+点涂全脸，由内向外推开
+
+### 3. 遮瑕
+黑眼圈、痘印重点遮盖
+
+### 4. 定妆
+散粉轻扫T区
+
+## 💄 眼妆步骤（8分钟）
+
+1. **眼影**：大地色打底
+2. **眼线**：内眼线增加神采
+3. **睫毛膏**：Z字形刷法
+
+## 💄 唇妆步骤（3分钟）
+
+先用润唇膏打底
+口红由内向外晕染`
+                },
+                {
+                    id: 'beauty-fashion',
+                    name: '穿搭配色指南',
+                    category: '时尚美妆',
+                    desc: '色彩搭配技巧',
+                    config: { aspectRatio: '3:4', fontFamily: "'Noto Sans SC'", mdTheme: 'minimal', bgColor: '#F5F5F5', borderColor: '#A9A9A9', borderWidth: 3 },
+                    content: `# 万能配色公式
+
+## 🎨 经典配色
+
+### 黑白灰
+**永不过时的经典**
+适合：通勤、正式场合
+
+### 蓝白
+**清爽干净**
+适合：夏天、休闲风
+
+### 驼色+白色
+**温柔高级**
+适合：秋冬、知性风
+
+## 🎨 撞色搭配
+
+### 红+绿
+圣诞风，需要控制比例
+
+### 蓝+橙
+活力十足，年轻化
+
+### 紫+黄
+对比强烈，个性张扬
+
+## 💡 搭配原则
+
+✅ 全身颜色不超过3种
+✅ 确定主色调（占60%）
+✅ 辅助色占30%，点缀色10%
+✅ 同色系深浅搭配最安全`
+                }
+            ],
+            
+            // 职场办公（2个）
+            office: [
+                {
+                    id: 'office-excel',
+                    name: 'Excel技巧大全',
+                    category: '职场办公',
+                    desc: '提升办公效率',
+                    config: { aspectRatio: '16:9', fontFamily: "'Fira Code'", mdTheme: 'modern', bgColor: '#F0F4F8', borderColor: '#217346', borderWidth: 4 },
+                    content: `# Excel必学10大函数
+
+## 1. VLOOKUP - 查找神器
+\`\`\`
+=VLOOKUP(查找值,数据区域,列号,0)
+\`\`\`
+**应用场景**：匹配工号查姓名
+
+## 2. IF - 条件判断
+\`\`\`
+=IF(条件,真值,假值)
+\`\`\`
+**示例**：=IF(A1>=60,"及格","不及格")
+
+## 3. SUMIF - 条件求和
+\`\`\`
+=SUMIF(条件区域,条件,求和区域)
+\`\`\`
+
+## 4. COUNTIF - 条件计数
+\`\`\`
+=COUNTIF(范围,条件)
+\`\`\`
+
+## 5. INDEX+MATCH - 强化查找
+比VLOOKUP更灵活强大
+
+## 快捷键TOP5
+**Ctrl+T**：创建表格
+**Alt+=**：快速求和
+**F4**：绝对引用`
+                },
+                {
+                    id: 'office-ppt',
+                    name: 'PPT设计法则',
+                    category: '职场办公',
+                    desc: '专业演示技巧',
+                    config: { aspectRatio: '16:9', fontFamily: "'Noto Sans SC'", mdTheme: 'card', bgColor: '#FFFFFF', borderColor: '#D24726', borderWidth: 4 },
+                    content: `# PPT设计黄金法则
+
+## 🎨 配色法则
+
+### 60-30-10原则
+- **主色**：60%（背景）
+- **辅色**：30%（标题、重点）
+- **强调色**：10%（点缀）
+
+### 安全配色
+**商务风**：蓝+灰+白
+**科技风**：黑+蓝+绿
+**活力风**：橙+蓝+白
+
+## 📐 排版法则
+
+### 对齐原则
+所有元素必须对齐
+左对齐、居中、右对齐选一种
+
+### 留白原则
+页面留白30-40%
+不要塞得太满
+
+### 重复原则
+字体、配色、版式保持统一
+
+## 💡 内容法则
+
+**一页一个核心观点**
+**关键词>完整句子**
+**图表>文字**`
+                }
+            ]
+        };
+
+        // ==================== 主程序逻辑 ====================
+        
+        let currentConfig = {
+            aspectRatio: '3:4',
+            fontFamily: "'Noto Sans SC'",
+            mdTheme: 'default',
+            bgColor: '#FFFFFF',
+            borderColor: '#C9A88C',
+            frameTheme: 'rounded-shadow',
+            borderWidth: 4,
+            maxChars: 500
+        };
+
+        let autoSaveTimer = null;
+        let previewCards = [];
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfig();
+            initEventListeners();
+            initModals();
+            loadDraft();
+            updatePreview();
+            startAutoSave();
+            updateStats();
+        });
+
+        // 加载配置
+        function loadConfig() {
+            const saved = localStorage.getItem('md-images-config-v4.2');
+            if (saved) {
+                currentConfig = { ...currentConfig, ...JSON.parse(saved) };
+                applyConfig();
+            }
+        }
+
+        // 应用配置
+        function applyConfig() {
+            document.getElementById('aspectRatio').value = currentConfig.aspectRatio;
+            document.getElementById('fontFamily').value = currentConfig.fontFamily;
+            document.getElementById('mdTheme').value = currentConfig.mdTheme;
+            document.getElementById('bgColor').value = currentConfig.bgColor;
+            document.getElementById('borderColor').value = currentConfig.borderColor;
+            document.getElementById('frameTheme').value = currentConfig.frameTheme;
+            document.getElementById('borderWidth').value = currentConfig.borderWidth;
+            document.getElementById('maxChars').value = currentConfig.maxChars;
+        }
+
+        // 保存配置
+        function saveConfig() {
+            localStorage.setItem('md-images-config-v4.2', JSON.stringify(currentConfig));
+        }
+
+        // 加载草稿
+        function loadDraft() {
+            const draft = localStorage.getItem('md-images-draft-v4.2');
+            if (draft) {
+                document.getElementById('markdownInput').value = draft;
+            }
+        }
+
+        // 自动保存草稿
+        function startAutoSave() {
+            const textarea = document.getElementById('markdownInput');
+            textarea.addEventListener('input', function() {
+                clearTimeout(autoSaveTimer);
+                autoSaveTimer = setTimeout(function() {
+                    localStorage.setItem('md-images-draft-v4.2', textarea.value);
+                    showStatus('✅ 草稿已自动保存', 2000);
+                }, 3000);
+            });
+        }
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 更新按钮
+            document.getElementById('updateBtn').addEventListener('click', updatePreview);
+            
+            // 导出ZIP
+            document.getElementById('exportZipBtn').addEventListener('click', exportAllAsZip);
+            
+            // 导出配置
+            document.getElementById('exportConfigBtn').addEventListener('click', exportConfig);
+            
+            // 导入配置
+            document.getElementById('importConfigBtn').addEventListener('click', function() {
+                document.getElementById('configFileInput').click();
+            });
+            document.getElementById('configFileInput').addEventListener('change', importConfig);
+            
+            // 打开模态框
+            document.getElementById('fontsBtn').addEventListener('click', function() {
+                renderFonts();
+                document.getElementById('fontsModal').style.display = 'block';
+            });
+            document.getElementById('themesBtn').addEventListener('click', function() {
+                renderThemes();
+                document.getElementById('themesModal').style.display = 'block';
+            });
+            document.getElementById('colorsBtn').addEventListener('click', function() {
+                renderColors();
+                document.getElementById('colorsModal').style.display = 'block';
+            });
+            document.getElementById('templatesBtn').addEventListener('click', function() {
+                renderTemplates();
+                document.getElementById('templatesModal').style.display = 'block';
+            });
+            
+            // 快速配色选择
+            document.getElementById('bgPreset').addEventListener('change', function(e) {
+                if (e.target.value) {
+                    document.getElementById('bgColor').value = e.target.value;
+                    currentConfig.bgColor = e.target.value;
+                }
+            });
+            
+            // 键盘快捷键
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key.toLowerCase()) {
+                        case 's':
+                            e.preventDefault();
+                            localStorage.setItem('md-images-draft-v4.2', document.getElementById('markdownInput').value);
+                            showStatus('✅ 草稿已保存', 2000);
+                            break;
+                        case 'e':
+                            e.preventDefault();
+                            exportAllAsZip();
+                            break;
+                        case 'i':
+                            e.preventDefault();
+                            document.getElementById('configFileInput').click();
+                            break;
+                        case 't':
+                            e.preventDefault();
+                            renderTemplates();
+                            document.getElementById('templatesModal').style.display = 'block';
+                            break;
+                    }
+                } else if (e.key === '?') {
+                    e.preventDefault();
+                    const hint = document.getElementById('keyboardHint');
+                    hint.classList.toggle('show');
+                    setTimeout(() => hint.classList.remove('show'), 5000);
+                }
+            });
+        }
+
+        // 初始化模态框
+        function initModals() {
+            const modals = ['fonts', 'themes', 'colors', 'templates'];
+            modals.forEach(name => {
+                const closeBtn = document.getElementById(`close${name.charAt(0).toUpperCase() + name.slice(1)}Btn`);
+                const modal = document.getElementById(`${name}Modal`);
+                
+                closeBtn.addEventListener('click', function() {
+                    modal.style.display = 'none';
+                });
+                
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // 渲染字体库
+        function renderFonts() {
+            const container = document.getElementById('fontsContainer');
+            const categories = [...new Set(fontLibrary.map(f => f.category))];
+            
+            let html = '';
+            categories.forEach(cat => {
+                html += `<div class="section-title">${cat}</div>`;
+                html += '<div class="grid-3">';
+                fontLibrary.filter(f => f.category === cat).forEach(font => {
+                    const active = currentConfig.fontFamily === font.family ? 'active' : '';
+                    html += `
+                        <div class="font-card ${active}" onclick="selectFont('${font.family}')">
+                            <div class="item-name">${font.name}</div>
+                            <div class="font-preview" style="font-family: ${font.family}">${font.preview}</div>
+                            <div class="item-desc">${font.desc}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        // 渲染主题库
+        function renderThemes() {
+            const container = document.getElementById('themesContainer');
+            const categories = [...new Set(themeLibrary.map(t => t.category))];
+            
+            let html = '';
+            categories.forEach(cat => {
+                html += `<div class="section-title">${cat}</div>`;
+                html += '<div class="grid-3">';
+                themeLibrary.filter(t => t.category === cat).forEach(theme => {
+                    const active = currentConfig.mdTheme === theme.id ? 'active' : '';
+                    html += `
+                        <div class="theme-card ${active}" onclick="selectTheme('${theme.id}')">
+                            <div class="color-swatch" style="background: ${theme.bgColor}"></div>
+                            <div class="item-name">${theme.name}</div>
+                            <div class="item-desc">${theme.desc}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        // 渲染配色库
+        function renderColors() {
+            const container = document.getElementById('colorsContainer');
+            const colorCategories = {
+                cream: '奶油色系',
+                morandi: '莫兰迪色系',
+                traditional: '中国传统色',
+                pure: '纯净色系',
+                fashion: '时尚色系',
+                macaron: '马卡龙色系',
+                japan: '日本传统色',
+                nature: '自然系'
+            };
+            
+            let html = '';
+            Object.keys(colorLibrary).forEach(key => {
+                html += `<div class="section-title">${colorCategories[key]}（${colorLibrary[key].length}款）</div>`;
+                html += '<div class="grid-2">';
+                colorLibrary[key].forEach(color => {
+                    const active = currentConfig.bgColor === color.bg && currentConfig.borderColor === color.border ? 'active' : '';
+                    html += `
+                        <div class="color-preset ${active}" onclick="selectColor('${color.bg}', '${color.border}')">
+                            <div class="color-swatch" style="background: ${color.bg}; border: 2px solid ${color.border}"></div>
+                            <div class="item-name">${color.name}</div>
+                            <div class="item-desc">${color.desc}</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        // 渲染模板库
+        function renderTemplates() {
+            const container = document.getElementById('templatesContainer');
+            const categories = {
+                baby: '👶 母婴育儿',
+                tech: '💻 科技数码',
+                food: '🍜 美食餐饮',
+                travel: '✈️ 旅行攻略',
+                finance: '💰 金融理财',
+                education: '📚 教育学习',
+                health: '💪 健康养生',
+                beauty: '💄 时尚美妆',
+                office: '📊 职场办公'
+            };
+            
+            let html = '';
+            Object.keys(templateLibrary).forEach(key => {
+                html += `<div class="section-title">${categories[key]}（${templateLibrary[key].length}个）</div>`;
+                html += '<div class="grid-3">';
+                templateLibrary[key].forEach(template => {
+                    html += `
+                        <div class="template-card" onclick="applyTemplate('${key}', '${template.id}')">
+                            <div class="item-name">${template.name}</div>
+                            <div class="item-desc">${template.desc}</div>
+                            <div style="font-size: 10px; color: #9ca3af; margin-top: 6px;">
+                                ${template.config.aspectRatio} | ${template.config.mdTheme}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        // 选择字体
+        function selectFont(family) {
+            currentConfig.fontFamily = family;
+            document.getElementById('fontFamily').value = family;
+            saveConfig();
+            updatePreview();
+            document.getElementById('fontsModal').style.display = 'none';
+            showStatus('✅ 字体已应用', 2000);
+        }
+
+        // 选择主题
+        function selectTheme(themeId) {
+            currentConfig.mdTheme = themeId;
+            document.getElementById('mdTheme').value = themeId;
+            saveConfig();
+            updatePreview();
+            document.getElementById('themesModal').style.display = 'none';
+            showStatus('✅ 主题已应用', 2000);
+        }
+
+        // 选择配色
+        function selectColor(bg, border) {
+            currentConfig.bgColor = bg;
+            currentConfig.borderColor = border;
+            document.getElementById('bgColor').value = bg;
+            document.getElementById('borderColor').value = border;
+            saveConfig();
+            updatePreview();
+            document.getElementById('colorsModal').style.display = 'none';
+            showStatus('✅ 配色已应用', 2000);
+        }
+
+        // 应用模板
+        function applyTemplate(category, templateId) {
+            const template = templateLibrary[category].find(t => t.id === templateId);
+            if (template) {
+                currentConfig = { ...currentConfig, ...template.config };
+                document.getElementById('markdownInput').value = template.content;
+                applyConfig();
+                saveConfig();
+                updatePreview();
+                document.getElementById('templatesModal').style.display = 'none';
+                showStatus('✅ 模板已应用', 2000);
+            }
+        }
+
+        // 更新预览
+        function updatePreview() {
+            // 获取配置
+            currentConfig.aspectRatio = document.getElementById('aspectRatio').value;
+            currentConfig.fontFamily = document.getElementById('fontFamily').value;
+            currentConfig.mdTheme = document.getElementById('mdTheme').value;
+            currentConfig.bgColor = document.getElementById('bgColor').value;
+            currentConfig.borderColor = document.getElementById('borderColor').value;
+            currentConfig.frameTheme = document.getElementById('frameTheme').value;
+            currentConfig.borderWidth = parseInt(document.getElementById('borderWidth').value);
+            currentConfig.maxChars = parseInt(document.getElementById('maxChars').value);
+            
+            saveConfig();
+            
+            const markdown = document.getElementById('markdownInput').value;
+            if (!markdown.trim()) {
+                document.getElementById('previewContainer').innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p>在左侧输入Markdown内容</p>
+                        <p>或点击「📋 模板」快速开始</p>
+                    </div>
+                `;
+                document.getElementById('rightInfo').textContent = '共 0 页';
+                return;
+            }
+            
+            // 分割Markdown
+            const chunks = splitMarkdown(markdown, currentConfig.maxChars);
+            previewCards = chunks;
+            
+            // 渲染预览卡片
+            renderPreviewCards(chunks);
+            
+            // 更新统计
+            document.getElementById('rightInfo').textContent = `共 ${chunks.length} 页`;
+            updateStats();
+        }
+
+        // 分割Markdown
+        function splitMarkdown(text, maxChars) {
+            const lines = text.split('\n');
+            const chunks = [];
+            let currentChunk = '';
+            let currentLength = 0;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const lineLength = line.length + 1; // +1 for newline
+                
+                // 判断是否为标题或分隔符
+                const isHeading = /^#{1,6}\s/.test(line);
+                const isDivider = /^---+$/.test(line);
+                
+                // 如果当前行是分隔符，作为分割点
+                if (isDivider && currentChunk.trim()) {
+                    chunks.push(currentChunk.trim());
+                    currentChunk = '';
+                    currentLength = 0;
+                    continue;
+                }
+                
+                // 如果添加当前行会超出限制
+                if (currentLength + lineLength > maxChars && currentChunk.trim()) {
+                    // 如果当前行是标题，优先保留到下一页
+                    if (isHeading) {
+                        chunks.push(currentChunk.trim());
+                        currentChunk = line + '\n';
+                        currentLength = lineLength;
+                    } else {
+                        currentChunk += line + '\n';
+                        chunks.push(currentChunk.trim());
+                        currentChunk = '';
+                        currentLength = 0;
+                    }
+                } else {
+                    currentChunk += line + '\n';
+                    currentLength += lineLength;
+                }
+            }
+            
+            // 添加最后一个chunk
+            if (currentChunk.trim()) {
+                chunks.push(currentChunk.trim());
+            }
+            
+            return chunks;
+        }
+
+        // 渲染预览卡片
+        function renderPreviewCards(chunks) {
+            const container = document.getElementById('previewContainer');
+            container.innerHTML = '';
+            
+            chunks.forEach((chunk, index) => {
+                const card = document.createElement('div');
+                card.className = `preview-card frame-${currentConfig.frameTheme}`;
+                
+                const html = marked.parse(chunk);
+                const charCount = chunk.length;
+                
+                card.innerHTML = `
+                    <div class="preview-card-header">
+                        <span class="preview-number">第 ${index + 1} 页</span>
+                        <span class="preview-stats">${charCount} 字符</span>
+                        <button class="export-single-btn" onclick="exportSingle(${index})">导出</button>
+                    </div>
+                    <div class="preview-canvas" id="canvas-${index}">
+                        <div class="preview-content md-theme-${currentConfig.mdTheme}">${html}</div>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+                
+                // 应用样式
+                const canvas = card.querySelector('.preview-canvas');
+                applyStyles(canvas);
+            });
+        }
+
+        // 应用样式
+        function applyStyles(canvas) {
+            const [w, h] = currentConfig.aspectRatio.split(':').map(Number);
+            const width = 600;
+            const height = Math.round(width * h / w);
+            
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            canvas.style.background = currentConfig.bgColor;
+            canvas.style.fontFamily = currentConfig.fontFamily;
+            
+            // 应用边框
+            const borderWidth = currentConfig.borderWidth;
+            const borderColor = currentConfig.borderColor;
+            
+            if (currentConfig.frameTheme === 'solid-border') {
+                canvas.style.border = `${borderWidth}px solid ${borderColor}`;
+            } else if (currentConfig.frameTheme === 'minimal') {
+                canvas.style.border = `${borderWidth}px solid ${borderColor}`;
+                canvas.style.boxShadow = 'none';
+            }
+        }
+
+        // 导出单张
+        async function exportSingle(index) {
+            showLoading(`正在导出第 ${index + 1} 页...`);
+            
+            try {
+                const canvas = document.getElementById(`canvas-${index}`);
+                const dataUrl = await html2canvas(canvas, {
+                    scale: 2,
+                    backgroundColor: currentConfig.bgColor,
+                    logging: false,
+                    useCORS: true
+                }).then(c => c.toDataURL('image/png'));
+                
+                const link = document.createElement('a');
+                link.download = `image-${index + 1}.png`;
+                link.href = dataUrl;
+                link.click();
+                
+                hideLoading();
+                showStatus('✅ 导出成功', 2000);
+            } catch (error) {
+                hideLoading();
+                showStatus('❌ 导出失败: ' + error.message, 3000);
+            }
+        }
+
+        // 导出全部为ZIP
+        async function exportAllAsZip() {
+            if (previewCards.length === 0) {
+                showStatus('⚠️ 没有可导出的内容', 2000);
+                return;
+            }
+            
+            showLoading(`正在生成 ${previewCards.length} 张图片...`, 0, previewCards.length);
+            
+            try {
+                const zip = new JSZip();
+                
+                for (let i = 0; i < previewCards.length; i++) {
+                    updateLoadingProgress(i + 1, previewCards.length);
+                    
+                    const canvas = document.getElementById(`canvas-${i}`);
+                    const dataUrl = await html2canvas(canvas, {
+                        scale: 2,
+                        backgroundColor: currentConfig.bgColor,
+                        logging: false,
+                        useCORS: true
+                    }).then(c => c.toDataURL('image/png'));
+                    
+                    // 转换为blob
+                    const base64 = dataUrl.split(',')[1];
+                    const blob = await fetch(`data:image/png;base64,${base64}`).then(r => r.blob());
+                    
+                    zip.file(`image-${String(i + 1).padStart(2, '0')}.png`, blob);
+                    
+                    // 短暂延迟避免浏览器卡顿
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                // 生成ZIP
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                saveAs(zipBlob, `markdown-images-${Date.now()}.zip`);
+                
+                hideLoading();
+                showStatus('✅ ZIP导出成功！', 3000);
+            } catch (error) {
+                hideLoading();
+                showStatus('❌ 导出失败: ' + error.message, 3000);
+            }
+        }
+
+        // 导出配置
+        function exportConfig() {
+            const config = {
+                version: '4.2',
+                config: currentConfig,
+                content: document.getElementById('markdownInput').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(config, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `config-${Date.now()}.json`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            showStatus('✅ 配置已导出', 2000);
+        }
+
+        // 导入配置
+        function importConfig(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    
+                    if (data.config) {
+                        currentConfig = { ...currentConfig, ...data.config };
+                        applyConfig();
+                        saveConfig();
+                    }
+                    
+                    if (data.content) {
+                        document.getElementById('markdownInput').value = data.content;
+                    }
+                    
+                    updatePreview();
+                    showStatus('✅ 配置导入成功', 2000);
+                } catch (error) {
+                    showStatus('❌ 配置文件格式错误', 3000);
+                }
+            };
+            reader.readAsText(file);
+            
+            // 清空input
+            e.target.value = '';
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const text = document.getElementById('markdownInput').value;
+            const charCount = text.length;
+            document.getElementById('leftInfo').textContent = `${charCount} 字符`;
+            
+            const aspectName = {
+                '3:4': '小红书',
+                '1:1': 'Instagram',
+                '4:3': 'PPT',
+                '16:9': '公众号',
+                '9:16': '竖屏'
+            }[currentConfig.aspectRatio] || '';
+            
+            const fontName = fontLibrary.find(f => f.family === currentConfig.fontFamily)?.name || '默认';
+            const themeName = themeLibrary.find(t => t.id === currentConfig.mdTheme)?.name || '默认';
+            
+            document.getElementById('statsText').textContent = 
+                `平台: ${aspectName} ${currentConfig.aspectRatio} | 字体: ${fontName} | 主题: ${themeName}`;
+        }
+
+        // 显示加载动画
+        function showLoading(text = '正在处理...', current = 0, total = 0) {
+            document.getElementById('loadingText').textContent = text;
+            if (total > 0) {
+                document.getElementById('loadingProgress').textContent = `${current}/${total}`;
+            } else {
+                document.getElementById('loadingProgress').textContent = '';
+            }
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        // 更新加载进度
+        function updateLoadingProgress(current, total) {
+            document.getElementById('loadingProgress').textContent = `${current}/${total}`;
+        }
+
+        // 隐藏加载动画
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // 显示状态消息
+        function showStatus(message, duration = 2000) {
+            const statusText = document.getElementById('statusText');
+            const originalText = statusText.textContent;
+            statusText.textContent = message;
+            setTimeout(() => {
+                statusText.textContent = originalText;
+            }, duration);
+        }
+    </script>
+</body>
+</html>

@@ -81,29 +81,31 @@
 
         .controls {
             background: white;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border-bottom: 1px solid #e5e7eb;
-            overflow-x: auto;
-            overflow-y: hidden;
-            white-space: nowrap;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
         .control-row {
-            display: inline-flex;
-            gap: 8px;
-            padding: 4px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
         }
 
         .control-group {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 0 8px;
+            gap: 8px;
+            padding-right: 16px;
             border-right: 1px solid #e5e7eb;
         }
 
         .control-group:last-child {
             border-right: none;
+            padding-right: 0;
         }
 
         .control-group label {
@@ -1091,13 +1093,13 @@
     <div class="controls">
         <div class="control-row">
             <div class="control-group">
-                <label>平台:</label>
+                <label>比例:</label>
                 <select id="aspectRatio">
-                    <option value="3:4">小红书 3:4</option>
-                    <option value="1:1">Instagram 1:1</option>
-                    <option value="4:3">PPT 4:3</option>
-                    <option value="16:9">公众号 16:9</option>
-                    <option value="9:16">竖屏 9:16</option>
+                    <option value="3:4">3:4</option>
+                    <option value="1:1">1:1</option>
+                    <option value="4:3">4:3</option>
+                    <option value="16:9">16:9</option>
+                    <option value="9:16">9:16</option>
                 </select>
             </div>
 
@@ -1122,6 +1124,13 @@
                         <option value="'Fira Code'">Fira Code</option>
                     </optgroup>
                 </select>
+            </div>
+
+            <div class="control-group">
+                <label>大小:</label>
+                <input type="number" id="baseFontSize" value="14" min="10" max="30" step="1">px
+                <label>行距:</label>
+                <input type="number" id="lineHeight" value="1.8" min="1.0" max="3.0" step="0.1" style="width: 50px;">
             </div>
 
             <div class="control-group">
@@ -1160,33 +1169,20 @@
                 </select>
             </div>
 
-            <div class="control-group">
+            <div class="control-group" style="border-right: none;">
                 <label>边框:</label>
                 <select id="frameTheme">
-                    <option value="rounded-shadow">圆角阴影</option>
-                    <option value="solid-border">纯色边框</option>
-                    <option value="minimal">简约线框</option>
-                    <option value="none">无边框</option>
+                    <option value="rounded-shadow">圆角</option>
+                    <option value="solid-border">纯色</option>
+                    <option value="minimal">简约</option>
+                    <option value="none">无框</option>
                 </select>
-            </div>
-
-            <div class="control-group">
-                <label>边框色:</label>
                 <input type="color" id="borderColor" value="#C9A88C">
+                <input type="number" id="borderWidth" value="4" min="1" max="20" style="width: 45px;">px
             </div>
+        </div>
 
-            <div class="control-group">
-                <label>宽度:</label>
-                <input type="number" id="borderWidth" value="4" min="1" max="20">px
-            </div>
-
-            <div class="control-group">
-                <label>大小:</label>
-                <input type="number" id="baseFontSize" value="14" min="10" max="30" step="1">px
-                <label>行距:</label>
-                <input type="number" id="lineHeight" value="1.8" min="1.0" max="3.0" step="0.1">
-            </div>
-
+        <div class="control-row">
             <div class="control-group">
                 <label>分割:</label>
                 <select id="splitMethod">
@@ -1195,33 +1191,30 @@
                     <option value="manual">仅手动(---)</option>
                 </select>
                 <label>字符:</label>
-                <input type="number" id="maxChars" value="500" min="100" max="2000" step="50">
-            </div>
-
-            <div class="control-group">
-                <button class="btn btn-primary" id="updateBtn">
-                    <span>🔄</span> 更新
-                </button>
+                <input type="number" id="maxChars" value="500" min="100" max="2000" step="50" style="width: 55px;">
             </div>
 
             <div class="control-group">
                 <button class="btn btn-primary" id="fontsBtn">
-                    <span>🔤</span> 字体
+                    <span>🔤</span> 字体库
                 </button>
                 <button class="btn btn-primary" id="themesBtn">
-                    <span>🎨</span> 主题
+                    <span>🎨</span> 主题库
                 </button>
                 <button class="btn btn-primary" id="colorsBtn">
-                    <span>🌈</span> 配色
+                    <span>🌈</span> 配色库
+                </button>
+                <button class="btn btn-primary" id="templatesBtn">
+                    <span>📋</span> 模板库
                 </button>
             </div>
 
-            <div class="control-group">
-                <button class="btn btn-primary" id="templatesBtn">
-                    <span>📋</span> 模板
+            <div class="control-group" style="border-right: none; margin-left: auto;">
+                <button class="btn btn-info" id="updateBtn">
+                    <span>🔄</span> 刷新预览
                 </button>
                 <button class="btn btn-success" id="exportZipBtn">
-                    <span>📦</span> 导出ZIP
+                    <span>📦</span> 全部导出
                 </button>
             </div>
         </div>
@@ -1284,11 +1277,13 @@
     <div id="keyboardHint" class="keyboard-hint">
         <h4>⌨️ 快捷键</h4>
         <ul>
-            <li><span class="kbd">Ctrl+E</span> 导出ZIP</li>
+            <li><span class="kbd">Ctrl+E</span> 全部导出</li>
             <li><span class="kbd">Ctrl+T</span> 打开模板</li>
             <li><span class="kbd">?</span> 显示帮助</li>
         </ul>
     </div>
+
+    <div class="main-container">
         <div class="left-panel">
             <div class="panel-header">
                 <h3>📝 Markdown编辑器</h3>
@@ -1374,7 +1369,7 @@
 
     <div class="status-bar">
         <div id="statusText">准备就绪 | v4.2豪华版 | 147项专业资源</div>
-        <div id="statsText">平台: 小红书 3:4 | 字体: 思源黑体 | 主题: 默认简约</div>
+        <div id="statsText">比例: 3:4 | 字体: 思源黑体 | 主题: 默认简约</div>
     </div>
 
     <script>
@@ -2923,19 +2918,11 @@ if age >= 18:
             const charCount = text.length;
             document.getElementById('leftInfo').textContent = `${charCount} 字符`;
             
-            const aspectName = {
-                '3:4': '小红书',
-                '1:1': 'Instagram',
-                '4:3': 'PPT',
-                '16:9': '公众号',
-                '9:16': '竖屏'
-            }[currentConfig.aspectRatio] || '';
-            
             const fontName = fontLibrary.find(f => f.family === currentConfig.fontFamily)?.name || '默认';
             const themeName = themeLibrary.find(t => t.id === currentConfig.mdTheme)?.name || '默认';
             
             document.getElementById('statsText').textContent = 
-                `平台: ${aspectName} ${currentConfig.aspectRatio} | 字体: ${fontName} | 主题: ${themeName}`;
+                `比例: ${currentConfig.aspectRatio} | 字体: ${fontName} | 主题: ${themeName}`;
         }
 
         // 显示加载动画

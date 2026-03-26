@@ -264,6 +264,25 @@
             font-family: inherit;
         }
 
+        .tb-select {
+            height: 28px;
+            padding: 0 4px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            color: #4b5563;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .tb-select:hover {
+            background: #e5e7eb;
+            color: #1f2937;
+        }
+
         .tb-btn:hover {
             background: #e5e7eb;
             color: #1f2937;
@@ -1239,7 +1258,7 @@
     <div class="header">
         <div class="header-content">
             <div>
-                <h1>📝 Markdown智能分割图片生成器 v4.2</h1>
+                <h1>📝 Markdown智能分割图片生成器</h1>
                 <p>豪华版 | 15款字体 | 12种主题 | 100+配色 | 20个模板 | 一键ZIP导出</p>
             </div>
             <div class="stats-badge">
@@ -1371,6 +1390,15 @@
             </div>
 
             <div class="control-group" style="border-right: none; margin-left: auto;">
+                <button class="btn" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1;" onclick="exportConfig()" title="导出当前配置为 JSON 文件">
+                    <span>📤</span> 导出配置
+                </button>
+                <button class="btn" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1;" onclick="document.getElementById('importConfigInput').click()" title="导入本地配置 JSON 文件">
+                    <span>📥</span> 导入配置
+                </button>
+                <input type="file" id="importConfigInput" accept=".json" style="display:none" onchange="importConfig(event)">
+                <div style="width: 8px;"></div> <!-- 占位分隔 -->
+                
                 <button class="btn btn-danger" id="resetBtn">
                     <span>🗑️</span> 重置清空
                 </button>
@@ -1457,9 +1485,18 @@
             <!-- Markdown 工具栏 -->
             <div class="md-toolbar">
                 <button class="tb-btn" onclick="insertMd('**', '**')" title="加粗"><b>B</b></button>
-                <button class="tb-btn" onclick="insertMd('### ', '')" title="标题">H</button>
-                <button class="tb-btn" onclick="insertMd('> ', '')" title="引用">"</button>
-                <button class="tb-btn" onclick="insertMd('- ', '')" title="无序列表">•</button>
+                <select class="tb-select" onchange="if(this.value) { insertMd(this.value, ''); this.value=''; }" title="插入标题">
+                    <option value="" disabled selected hidden>H 标题</option>
+                    <option value="# ">H1 一级标题</option>
+                    <option value="## ">H2 二级标题</option>
+                    <option value="### ">H3 三级标题</option>
+                    <option value="#### ">H4 四级标题</option>
+                    <option value="##### ">H5 五级标题</option>
+                    <option value="###### ">H6 六级标题</option>
+                </select>
+                <button class="tb-btn tb-text-btn" onclick="insertMd('> ', '')" title="插入引用">” 引用</button>
+                <button class="tb-btn tb-text-btn" onclick="insertMd('- ', '')" title="插入无序列表">• 列表</button>
+                <button class="tb-btn tb-text-btn" onclick="insertTable()" title="插入基础表格">⊞ 表格</button>
                 <div class="tb-divider"></div>
                 <button class="tb-btn tb-text-btn" onclick="insertMd('\n---\n', '')" title="插入分页符(强制换页)">--- 分页</button>
                 <button class="tb-btn tb-text-btn" onclick="insertMd('<br>', '')" title="强制换行">&lt;br&gt; 换行</button>
@@ -2623,6 +2660,12 @@ if age >= 18:
             document.getElementById('watermarkText').value = currentConfig.watermarkText || '';
         }
 
+        // 插入表格
+        function insertTable() {
+            const tableMd = `\n| 列1 | 列2 | 列3 |\n| :--- | :--- | :--- |\n| 内容 | 内容 | 内容 |\n| 内容 | 内容 | 内容 |\n`;
+            insertMd(tableMd, '');
+        }
+
         // Markdown 快捷插入
         function insertMd(prefix, suffix = '') {
             const textarea = document.getElementById('markdownInput');
@@ -3438,6 +3481,43 @@ if age >= 18:
                 hideLoading();
                 showStatus('❌ 导出失败: ' + error.message, 3000);
             }
+        }
+
+        // 导出配置
+        function exportConfig() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentConfig, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "md2pic_config.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            showStatus('✅ 配置已导出为文件');
+        }
+
+        // 导入配置
+        function importConfig(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedConfig = JSON.parse(e.target.result);
+                    if(typeof importedConfig === 'object' && importedConfig !== null) {
+                        currentConfig = { ...currentConfig, ...importedConfig };
+                        applyConfig();
+                        updatePreview();
+                        showStatus('✅ 配置导入成功');
+                    } else {
+                        throw new Error('无效格式');
+                    }
+                } catch (error) {
+                    alert('导入失败：不是有效的 JSON 配置文件。');
+                }
+                event.target.value = ''; // 允许重复导入同一文件
+            };
+            reader.readAsText(file);
         }
 
         // 导出全部为ZIP

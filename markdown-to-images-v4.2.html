@@ -1201,29 +1201,6 @@
             </div>
 
             <div class="control-group">
-                <label>字体:</label>
-                <select id="fontFamily">
-                    <optgroup label="无衬线（现代简约）">
-                        <option value="'Noto Sans SC'">思源黑体</option>
-                        <option value="'PingFang SC'">苹方</option>
-                        <option value="'Microsoft YaHei'">微软雅黑</option>
-                    </optgroup>
-                    <optgroup label="衬线（优雅知性）">
-                        <option value="'Noto Serif SC'">思源宋体</option>
-                        <option value="'SimSun'">宋体</option>
-                    </optgroup>
-                    <optgroup label="手写（温暖亲和）">
-                        <option value="'Ma Shan Zheng'">马善政楷体</option>
-                        <option value="'Long Cang'">龙藏体</option>
-                    </optgroup>
-                    <optgroup label="等宽（技术感）">
-                        <option value="'JetBrains Mono'">JetBrains Mono</option>
-                        <option value="'Fira Code'">Fira Code</option>
-                    </optgroup>
-                </select>
-            </div>
-
-            <div class="control-group">
                 <label>大小:</label>
                 <input type="number" id="baseFontSize" value="14" min="10" max="30" step="1">px
                 <label>行距:</label>
@@ -2554,7 +2531,6 @@ if age >= 18:
         // 应用配置
         function applyConfig() {
             document.getElementById('aspectRatio').value = currentConfig.aspectRatio || '3:4';
-            document.getElementById('fontFamily').value = currentConfig.fontFamily || "'Noto Sans SC'";
             document.getElementById('mdTheme').value = currentConfig.mdTheme || 'default';
             document.getElementById('bgColor').value = currentConfig.bgColor || '#FFFFFF';
             document.getElementById('borderColor').value = currentConfig.borderColor || '#C9A88C';
@@ -2605,7 +2581,7 @@ if age >= 18:
             document.getElementById('updateBtn').addEventListener('click', updatePreview);
             
             // 下拉框实时预览监听
-            const selectsToWatch = ['aspectRatio', 'fontFamily', 'mdTheme', 'frameTheme', 'splitMethod', 'textureOverlay'];
+            const selectsToWatch = ['aspectRatio', 'mdTheme', 'frameTheme', 'splitMethod', 'textureOverlay'];
             selectsToWatch.forEach(id => {
                 document.getElementById(id).addEventListener('change', updatePreview);
             });
@@ -2868,7 +2844,6 @@ if age >= 18:
 
         function selectFont(family) {
             currentConfig.fontFamily = family;
-            document.getElementById('fontFamily').value = family;
             updatePreview();
             document.getElementById('fontsModal').style.display = 'none';
             showStatus('✅ 字体已应用', 2000);
@@ -2914,9 +2889,8 @@ if age >= 18:
 
         // 更新预览
         function updatePreview() {
-            // 获取配置
+            // 获取配置 (fontFamily already maintained in currentConfig)
             currentConfig.aspectRatio = document.getElementById('aspectRatio').value;
-            currentConfig.fontFamily = document.getElementById('fontFamily').value;
             currentConfig.mdTheme = document.getElementById('mdTheme').value;
             currentConfig.bgColor = document.getElementById('bgColor').value;
             currentConfig.borderColor = document.getElementById('borderColor').value;
@@ -2953,6 +2927,8 @@ if age >= 18:
                     </div>
                 `;
                 document.getElementById('rightInfo').textContent = '共 0 页';
+                previewCards = []; // 清空卡片数据
+                updateStats(); // 确保重置后状态栏也更新
                 return;
             }
             

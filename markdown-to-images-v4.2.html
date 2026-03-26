@@ -237,6 +237,67 @@
             color: #6b7280;
         }
 
+        .md-toolbar {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tb-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 28px;
+            min-width: 28px;
+            padding: 0 6px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            color: #4b5563;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .tb-btn:hover {
+            background: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .tb-btn:active {
+            background: #d1d5db;
+        }
+        
+        .tb-btn.tb-text-btn {
+            padding: 0 10px;
+        }
+
+        .tb-btn.tb-primary {
+            background: #eff6ff;
+            color: #2563eb;
+            border-color: #bfdbfe;
+        }
+
+        .tb-btn.tb-primary:hover {
+            background: #dbeafe;
+        }
+
+        .tb-btn b {
+            font-weight: bold;
+        }
+
+        .tb-divider {
+            width: 1px;
+            height: 16px;
+            background: #d1d5db;
+            margin: 0 4px;
+        }
+
         .panel-content {
             flex: 1;
             padding: 16px;
@@ -1392,6 +1453,23 @@
                 <h3>📝 Markdown编辑器</h3>
                 <span class="info" id="leftInfo">0 字符</span>
             </div>
+            
+            <!-- Markdown 工具栏 -->
+            <div class="md-toolbar">
+                <button class="tb-btn" onclick="insertMd('**', '**')" title="加粗"><b>B</b></button>
+                <button class="tb-btn" onclick="insertMd('### ', '')" title="标题">H</button>
+                <button class="tb-btn" onclick="insertMd('> ', '')" title="引用">"</button>
+                <button class="tb-btn" onclick="insertMd('- ', '')" title="无序列表">•</button>
+                <div class="tb-divider"></div>
+                <button class="tb-btn tb-text-btn" onclick="insertMd('\n---\n', '')" title="插入分页符(强制换页)">--- 分页</button>
+                <button class="tb-btn tb-text-btn" onclick="insertMd('<br>', '')" title="强制换行">&lt;br&gt; 换行</button>
+                <div class="tb-divider"></div>
+                <button class="tb-btn tb-text-btn tb-primary" onclick="document.getElementById('imgUploadInput').click()" title="插入本地图片">
+                    <span>🖼️</span> 插入图片
+                </button>
+                <input type="file" id="imgUploadInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+            </div>
+
             <div class="panel-content">
                 <textarea id="markdownInput" placeholder="在此输入Markdown内容...
 
@@ -2543,6 +2621,85 @@ if age >= 18:
             document.getElementById('textureOverlay').value = currentConfig.textureOverlay || 'none';
             document.getElementById('firstPageCover').checked = !!currentConfig.firstPageCover;
             document.getElementById('watermarkText').value = currentConfig.watermarkText || '';
+        }
+
+        // Markdown 快捷插入
+        function insertMd(prefix, suffix = '') {
+            const textarea = document.getElementById('markdownInput');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            const selectedText = text.substring(start, end);
+
+            const replacement = prefix + selectedText + suffix;
+            textarea.value = text.substring(0, start) + replacement + text.substring(end);
+            
+            // 重新定位光标
+            textarea.focus();
+            if (selectedText.length > 0) {
+                textarea.selectionStart = start;
+                textarea.selectionEnd = start + replacement.length;
+            } else {
+                textarea.selectionStart = start + prefix.length;
+                textarea.selectionEnd = start + prefix.length;
+            }
+            
+            // 触发更新
+            updatePreview();
+        }
+
+        // 处理图片上传并插入图片
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 如果不是图片，直接返回
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // 限制最大宽度，避免生成过大的 Base64 导致卡顿
+                    const MAX_WIDTH = 1200;
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 如果原图是 PNG 且可能有透明背景，使用 jpeg 压缩前需要填充白色底色，否则透明变黑
+                    if (file.type === 'image/png' || file.type === 'image/webp') {
+                        // 也可以直接生成 png 但体积较大，这里为了性能仍压成 jpeg，给透明图加白底
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, width, height);
+                    }
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 压缩为 JPEG, 质量 0.7
+                    const base64Str = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    // 将其插入到编辑器光标处
+                    insertMd(`\n![图片](${base64Str})\n`, '');
+                    
+                    // 清空选择，允许重复上传同一张图
+                    event.target.value = ''; 
+                    showStatus('✅ 图片已插入');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         // 初始化事件监听

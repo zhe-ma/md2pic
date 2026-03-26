@@ -1333,6 +1333,9 @@
             </div>
 
             <div class="control-group" style="border-right: none; margin-left: auto;">
+                <button class="btn btn-danger" id="resetBtn">
+                    <span>🗑️</span> 重置清空
+                </button>
                 <button class="btn btn-info" id="updateBtn">
                     <span>🔄</span> 刷新预览
                 </button>
@@ -2557,7 +2560,10 @@ if age >= 18:
             document.getElementById('borderColor').value = currentConfig.borderColor || '#C9A88C';
             document.getElementById('frameTheme').value = currentConfig.frameTheme || 'rounded-shadow';
             document.getElementById('borderWidth').value = currentConfig.borderWidth || 4;
+            document.getElementById('splitMethod').value = currentConfig.splitMethod || 'auto';
             if(currentConfig.maxChars) document.getElementById('maxChars').value = currentConfig.maxChars;
+            if(currentConfig.baseFontSize) document.getElementById('baseFontSize').value = currentConfig.baseFontSize;
+            if(currentConfig.lineHeight) document.getElementById('lineHeight').value = currentConfig.lineHeight;
             document.getElementById('textureOverlay').value = currentConfig.textureOverlay || 'none';
             document.getElementById('firstPageCover').checked = !!currentConfig.firstPageCover;
             document.getElementById('watermarkText').value = currentConfig.watermarkText || '';
@@ -2565,6 +2571,36 @@ if age >= 18:
 
         // 初始化事件监听
         function initEventListeners() {
+            // 重置按钮
+            document.getElementById('resetBtn').addEventListener('click', function() {
+                if(confirm('确定要重置所有设置并清空输入内容吗？此操作无法撤销。')) {
+                    currentConfig = {
+                        aspectRatio: '3:4',
+                        fontFamily: "'Noto Sans SC'",
+                        mdTheme: 'default',
+                        bgColor: '#FFFFFF',
+                        borderColor: '#C9A88C',
+                        frameTheme: 'rounded-shadow',
+                        borderWidth: 4,
+                        maxChars: 500,
+                        splitMethod: 'auto',
+                        baseFontSize: 14,
+                        lineHeight: 1.8,
+                        textureOverlay: 'none',
+                        firstPageCover: false,
+                        watermarkText: ''
+                    };
+                    document.getElementById('markdownInput').value = '';
+                    try {
+                        localStorage.removeItem('md2pic_config_v4');
+                        localStorage.removeItem('md2pic_content_v4');
+                    } catch(e) {}
+                    applyConfig();
+                    updatePreview();
+                    showStatus('✅ 已重置并清空', 2000);
+                }
+            });
+
             // 更新按钮
             document.getElementById('updateBtn').addEventListener('click', updatePreview);
             
@@ -2718,7 +2754,7 @@ if age >= 18:
                 fontLibrary.filter(f => f.category === cat).forEach(font => {
                     const active = currentConfig.fontFamily === font.family ? 'active' : '';
                     html += `
-                        <div class="font-card ${active}" onclick="selectFont('${font.family}')">
+                        <div class="font-card ${active}" onclick="selectFontById('${font.id}')">
                             <div class="item-name">${font.name}</div>
                             <div class="font-preview" style="font-family: ${font.family}">${font.preview}</div>
                             <div class="item-desc">${font.desc}</div>
@@ -2823,6 +2859,13 @@ if age >= 18:
         }
 
         // 选择字体
+        function selectFontById(id) {
+            const font = fontLibrary.find(f => f.id === id);
+            if (font) {
+                selectFont(font.family);
+            }
+        }
+
         function selectFont(family) {
             currentConfig.fontFamily = family;
             document.getElementById('fontFamily').value = family;
@@ -2937,8 +2980,22 @@ if age >= 18:
             
             const fs = currentConfig.baseFontSize;
             const lh = currentConfig.lineHeight;
+            const fontFamily = currentConfig.fontFamily;
             
             styleEl.textContent = `
+                .preview-content,
+                .preview-content h1,
+                .preview-content h2,
+                .preview-content h3,
+                .preview-content h4,
+                .preview-content p, 
+                .preview-content li, 
+                .preview-content td, 
+                .preview-content th,
+                .preview-content table,
+                .preview-content blockquote {
+                    font-family: ${fontFamily} !important;
+                }
                 .preview-content p, 
                 .preview-content li, 
                 .preview-content td, 

@@ -1111,31 +1111,18 @@
         }
 
         /* ------------------ 新增特性：纹理材质 ------------------ */
-        .preview-canvas.texture-noise::after {
-            content: '';
+        .texture-layer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
-            z-index: 50;
-        }
-        
-        .preview-canvas.texture-grid .preview-content-wrapper {
-            background-image: 
-                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px) !important;
-            background-size: 20px 20px !important;
+            z-index: 1; /* 在文字下方，背景上方 */
+            border-radius: inherit; /* 继承外层的圆角，避免超出边缘 */
+            overflow: hidden;
         }
 
-        .preview-canvas.texture-dot .preview-content-wrapper {
-            background-image: radial-gradient(rgba(0,0,0,0.1) 1px, transparent 1px) !important;
-            background-size: 16px 16px !important;
-            background-position: 0 0 !important;
-        }
-
-        .preview-canvas.texture-paper .preview-content-wrapper {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='paper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.01' numOctaves='5' result='noise'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0 0 0.9 0 0 0 0 0 0.8 0 0 0 0 0 0.5 0' in='noise' result='coloredNoise'/%3E%3CfeComposite operator='in' in='coloredNoise' in2='SourceGraphic' result='composite'/%3E%3CfeBlend mode='multiply' in='composite' in2='SourceGraphic'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' fill='%23faf8f5' filter='url(%23paper)' opacity='0.5'/%3E%3C/svg%3E") !important;
-            background-blend-mode: multiply;
+        .preview-content {
+            position: relative;
+            z-index: 2; /* 确保文字在纹理上方并且可选中 */
         }
 
         /* ------------------ 新增特性：水印署名 ------------------ */
@@ -1281,12 +1268,12 @@
 
             <div class="control-group" style="border-right: none;">
                 <label>相框:</label>
-                <select id="frameTheme">
+                <select id="frameTheme" title="选择相框。注意'Mac视窗'自带左上角三圆点控制按钮">
                     <option value="none">无框</option>
                     <option value="rounded-shadow">圆角阴影</option>
                     <option value="solid-border">纯色</option>
                     <option value="minimal">简约</option>
-                    <option value="mac-window">Mac 视窗</option>
+                    <option value="mac-window">Mac 视窗(带三圆点)</option>
                     <option value="polaroid">拍立得</option>
                     <option value="tape">胶带便签</option>
                     <option value="glow">渐变发光</option>
@@ -2471,12 +2458,75 @@ if age >= 18:
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
+            generateTextures();
             loadFromLocalStorage();
             initEventListeners();
             initModals();
             updatePreview();
             updateStats();
         });
+
+        // 自动生成用于 html2canvas 导出的 Base64 纹理
+        function generateTextures() {
+            const Textures = {};
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Noise
+            canvas.width = 100; canvas.height = 100;
+            ctx.clearRect(0, 0, 100, 100);
+            for(let x=0; x<100; x++) {
+                for(let y=0; y<100; y++) {
+                    if(Math.random() > 0.5) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+                        ctx.fillRect(x,y,1,1);
+                    }
+                }
+            }
+            Textures.noise = canvas.toDataURL('image/png');
+
+            // Grid
+            canvas.width = 20; canvas.height = 20;
+            ctx.clearRect(0,0,20,20);
+            ctx.fillStyle = 'rgba(0,0,0,0.05)';
+            ctx.fillRect(0,0,20,1);
+            ctx.fillRect(0,0,1,20);
+            Textures.grid = canvas.toDataURL('image/png');
+
+            // Dot
+            canvas.width = 16; canvas.height = 16;
+            ctx.clearRect(0,0,16,16);
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
+            ctx.beginPath();
+            ctx.arc(2, 2, 1, 0, Math.PI*2);
+            ctx.fill();
+            Textures.dot = canvas.toDataURL('image/png');
+
+            // Paper
+            canvas.width = 100; canvas.height = 100;
+            ctx.clearRect(0,0,100,100);
+            ctx.fillStyle = 'rgba(230, 220, 200, 0.2)'; 
+            ctx.fillRect(0,0,100,100);
+            for(let x=0; x<100; x+=2) {
+                for(let y=0; y<100; y+=2) {
+                    if(Math.random() > 0.3) {
+                        ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.04})`;
+                        ctx.fillRect(x,y,2,2);
+                    }
+                }
+            }
+            Textures.paper = canvas.toDataURL('image/png');
+
+            // 注入样式 (加上 !important 确保生效并且被 html2canvas 捕获)
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .texture-layer.texture-noise { background-image: url(${Textures.noise}) !important; background-repeat: repeat; mix-blend-mode: normal; }
+                .texture-layer.texture-grid { background-image: url(${Textures.grid}) !important; background-repeat: repeat; mix-blend-mode: normal; }
+                .texture-layer.texture-dot { background-image: url(${Textures.dot}) !important; background-repeat: repeat; mix-blend-mode: normal; }
+                .texture-layer.texture-paper { background-image: url(${Textures.paper}) !important; background-repeat: repeat; mix-blend-mode: normal; }
+            `;
+            document.head.appendChild(style);
+        }
 
         // 自动保存与恢复
         function loadFromLocalStorage() {
@@ -3012,13 +3062,14 @@ if age >= 18:
                         <span class="preview-stats">${charCount} 字符</span>
                         <button class="export-single-btn" onclick="exportSingle(${index})">导出</button>
                     </div>
-                    <div class="preview-canvas ${textureClass}" id="canvas-${index}">
+                    <div class="preview-canvas" id="canvas-${index}">
                         <div class="preview-content-wrapper">
+                            <div class="texture-layer ${textureClass}"></div>
                             <div class="frame-decor-tape"></div>
                             <div class="frame-decor-mac">
-                                <span class="mac-dot" style="background:#ff5f56"></span>
-                                <span class="mac-dot" style="background:#ffbd2e"></span>
-                                <span class="mac-dot" style="background:#27c93f"></span>
+                                <span class="mac-dot" style="background:#ff5f56" title="关闭"></span>
+                                <span class="mac-dot" style="background:#ffbd2e" title="最小化"></span>
+                                <span class="mac-dot" style="background:#27c93f" title="全屏"></span>
                             </div>
                             <div class="preview-content md-theme-${currentConfig.mdTheme} ${coverClass}">${html}</div>
                             ${watermarkHtml}
@@ -3064,8 +3115,12 @@ if age >= 18:
                 wrapper.style.overflow = 'visible';
             }
 
+            // 重新获取需要重置显示状态的元素
             const macHeader = canvas.querySelector('.frame-decor-mac');
-            if (macHeader) macHeader.style.display = 'none';
+            if (macHeader) {
+                macHeader.style.display = 'none';
+                macHeader.style.opacity = '0'; // 确保在其它模式下不会意外渲染
+            }
             const tapeDecor = canvas.querySelector('.frame-decor-tape');
             if (tapeDecor) tapeDecor.style.display = 'none';
 
@@ -3098,7 +3153,10 @@ if age >= 18:
                     wrapper.style.borderRadius = '12px';
                     wrapper.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)';
                 }
-                if (macHeader) macHeader.style.display = 'flex';
+                if (macHeader) {
+                    macHeader.style.display = 'flex';
+                    macHeader.style.opacity = '1';
+                }
                 if (content) content.style.paddingTop = '48px'; 
             }
             else if (frame === 'polaroid') {

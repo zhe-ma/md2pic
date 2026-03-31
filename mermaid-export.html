@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid 高清图片导出</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+
+    <style>
+        :root {
+            --bg:        #f4f6f9;
+            --panel:     #ffffff;
+            --border:    #e2e8f0;
+            --accent:    #6366f1;
+            --accent-h:  #4f46e5;
+            --text:      #1e293b;
+            --muted:     #64748b;
+            --radius:    12px;
+            --shadow:    0 4px 24px rgba(0,0,0,.08);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Header ─────────────────────────────── */
+        header {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #fff;
+            padding: 18px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 12px rgba(99,102,241,.3);
+        }
+        header svg { flex-shrink: 0; }
+        header h1  { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+        header p   { font-size: 12px; opacity: .85; margin-top: 2px; }
+
+        /* ── Main layout ─────────────────────────── */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 24px 32px;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 900px) {
+            main { grid-template-columns: 1fr; }
+        }
+
+        /* ── Panel ───────────────────────────────── */
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #fafbfc;
+            gap: 10px;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .6px;
+        }
+
+        /* ── Editor ──────────────────────────────── */
+        #editor {
+            flex: 1;
+            width: 100%;
+            min-height: 420px;
+            padding: 16px;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text);
+            background: #fff;
+            tab-size: 2;
+        }
+
+        /* ── Preview panel ───────────────────────── */
+        .preview-body {
+            flex: 1;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow: auto;
+            gap: 16px;
+            min-height: 420px;
+            background: #fafbfc;
+        }
+
+        /* 渲染后的 SVG 容器 */
+        #diagram-wrap {
+            background: #fff;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            padding: 32px;          /* 边缘留白 */
+            box-shadow: 0 2px 12px rgba(0,0,0,.06);
+            max-width: 100%;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 200px;
+            min-height: 100px;
+        }
+
+        #diagram-wrap svg {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* 错误提示 */
+        .error-box {
+            background: #fff1f2;
+            border: 1px solid #fecdd3;
+            border-radius: 8px;
+            padding: 14px 18px;
+            color: #e11d48;
+            font-size: 13px;
+            line-height: 1.6;
+            width: 100%;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* 空态 */
+        .empty-hint {
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.8;
+            padding: 40px 0;
+        }
+        .empty-hint .icon { font-size: 40px; margin-bottom: 10px; }
+
+        /* ── Buttons ─────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border: none;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap;
+        }
+        .btn:active { transform: scale(.97); }
+
+        .btn-render {
+            background: #e0e7ff;
+            color: var(--accent);
+        }
+        .btn-render:hover { background: #c7d2fe; }
+
+        .btn-export-png {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-export-png:hover { background: var(--accent-h); }
+
+        .btn-export-svg {
+            background: #f1f5f9;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-export-svg:hover { background: #e2e8f0; }
+
+        .btn-copy {
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+        .btn-copy:hover { background: #dcfce7; }
+
+        .btn-clear {
+            background: #fff1f2;
+            color: #e11d48;
+            border: 1px solid #fecdd3;
+        }
+        .btn-clear:hover { background: #ffe4e6; }
+
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ── Export options ──────────────────────── */
+        .export-options {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .export-options label {
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+        .export-options select,
+        .export-options input[type=number] {
+            padding: 5px 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12px;
+            background: #fff;
+            color: var(--text);
+        }
+        .export-options input[type=number] { width: 68px; }
+
+        /* ── Scale indicator ─────────────────────── */
+        .scale-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--muted);
+            background: #f1f5f9;
+            padding: 4px 9px;
+            border-radius: 20px;
+        }
+
+        /* ── Status bar ──────────────────────────── */
+        .statusbar {
+            background: #f8fafc;
+            border-top: 1px solid var(--border);
+            padding: 8px 32px;
+            font-size: 11px;
+            color: var(--muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ── Samples ─────────────────────────────── */
+        .samples {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .sample-btn {
+            padding: 3px 10px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            background: #fff;
+            color: var(--muted);
+            transition: all .15s;
+        }
+        .sample-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #eef2ff;
+        }
+
+        /* ── Loading spinner ─────────────────────── */
+        .spinner {
+            width: 20px; height: 20px;
+            border: 3px solid #e0e7ff;
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner.active { display: inline-block; }
+
+        /* 隐藏的离屏渲染容器 */
+        #offscreen { position: absolute; left: -9999px; top: 0; visibility: hidden; }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<header>
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <path d="M14 17.5h7M17.5 14v7"/>
+    </svg>
+    <div>
+        <h1>Mermaid 高清图片导出</h1>
+        <p>贴入 Mermaid 代码 → 实时预览 → 一键导出高清 PNG / SVG</p>
+    </div>
+</header>
+
+<!-- ── Main ────────────────────────────────────────────────── -->
+<main>
+
+    <!-- 左侧编辑器 -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">Mermaid 代码</span>
+            <div class="btn-group">
+                <div class="samples">
+                    <span class="sample-btn" data-type="flowchart">流程图</span>
+                    <span class="sample-btn" data-type="sequence">时序图</span>
+                    <span class="sample-btn" data-type="class">类图</span>
+                    <span class="sample-btn" data-type="gantt">甘特图</span>
+                    <span class="sample-btn" data-type="er">ER图</span>
+                    <span class="sample-btn" data-type="mindmap">思维导图</span>
+                </div>
+            </div>
+        </div>
+        <div class="panel-header" style="border-top:0; background:#fff; gap:8px; flex-wrap:wrap;">
+            <div class="btn-group">
+                <button class="btn btn-render" id="renderBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    渲染预览
+                </button>
+                <button class="btn btn-clear" id="clearBtn">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                    清空
+                </button>
+            </div>
+            <span class="scale-badge">⌨ Ctrl+Enter 渲染</span>
+        </div>
+        <textarea id="editor" spellcheck="false" placeholder="在此粘贴 Mermaid 代码...
+
+例如：
+flowchart LR
+    A[开始] --> B{判断}
+    B -- 是 --> C[处理]
+    B -- 否 --> D[结束]
+    C --> D"></textarea>
+    </div>
+
+    <!-- 右侧预览 -->
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title">预览</span>
+            <div class="spinner" id="spinner"></div>
+        </div>
+        <div class="panel-header" style="border-top:0; background:#fff; gap:10px; flex-wrap:wrap;">
+            <div class="export-options">
+                <label>背景</label>
+                <select id="bgSelect">
+                    <option value="#ffffff">白色</option>
+                    <option value="transparent">透明</option>
+                    <option value="#f8fafc">浅灰</option>
+                    <option value="#1e293b">深色</option>
+                    <option value="custom">自定义…</option>
+                </select>
+                <input type="color" id="bgColor" value="#ffffff" style="width:32px;height:28px;padding:2px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;display:none">
+
+                <label>边距 px</label>
+                <input type="number" id="padding" value="40" min="0" max="200">
+
+                <label>缩放</label>
+                <select id="scaleSelect">
+                    <option value="1">1×</option>
+                    <option value="2" selected>2× (推荐)</option>
+                    <option value="3">3×</option>
+                    <option value="4">4×</option>
+                </select>
+            </div>
+        </div>
+        <div class="panel-header" style="border-top:0; background:#fff;">
+            <div class="btn-group">
+                <button class="btn btn-export-png" id="exportPng">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    导出 PNG
+                </button>
+                <button class="btn btn-export-svg" id="exportSvg">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    导出 SVG
+                </button>
+                <button class="btn btn-copy" id="copySvg">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                    复制 SVG
+                </button>
+            </div>
+        </div>
+        <div class="preview-body" id="previewBody">
+            <div class="empty-hint">
+                <div class="icon">📊</div>
+                <div>粘贴 Mermaid 代码后点击<b>渲染预览</b><br>或按 <b>Ctrl+Enter</b></div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- 状态栏 -->
+<div class="statusbar">
+    <span id="statusMsg">就绪</span>
+    <span id="diagramSize"></span>
+</div>
+
+<!-- 离屏渲染容器（用于高质量 PNG 导出） -->
+<div id="offscreen"></div>
+
+<script>
+// ── 示例代码 ─────────────────────────────────────────────────────────────────
+const SAMPLES = {
+    flowchart: `flowchart TD
+    A([开始]) --> B[/输入数据/]
+    B --> C{数据合法?}
+    C -- 是 --> D[处理业务逻辑]
+    C -- 否 --> E[返回错误]
+    D --> F[(存入数据库)]
+    F --> G[/返回结果/]
+    G --> H([结束])
+    E --> H`,
+
+    sequence: `sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant F as 前端
+    participant G as 网关
+    participant S as 服务
+    participant D as 数据库
+
+    U->>F: 提交请求
+    F->>G: HTTP POST /api
+    G->>G: 鉴权校验
+    G->>S: gRPC 调用
+    S->>D: SELECT query
+    D-->>S: 返回数据
+    S-->>G: 响应
+    G-->>F: JSON 响应
+    F-->>U: 显示结果`,
+
+    class: `classDiagram
+    direction LR
+    class Animal {
+        +String name
+        +int age
+        +makeSound() void
+    }
+    class Dog {
+        +String breed
+        +fetch() void
+    }
+    class Cat {
+        +bool indoor
+        +purr() void
+    }
+    class Owner {
+        +String name
+        +List~Animal~ pets
+        +adopt(Animal) void
+    }
+    Animal <|-- Dog
+    Animal <|-- Cat
+    Owner "1" o-- "0..*" Animal : 饲养`,
+
+    gantt: `gantt
+    title 项目开发计划
+    dateFormat YYYY-MM-DD
+    excludes weekends
+
+    section 需求阶段
+    需求调研      :done,    req1, 2024-01-01, 7d
+    需求评审      :done,    req2, after req1, 3d
+
+    section 设计阶段
+    架构设计      :done,    des1, after req2, 5d
+    UI 原型       :active,  des2, after req2, 7d
+
+    section 开发阶段
+    后端开发      :         dev1, after des1, 14d
+    前端开发      :         dev2, after des2, 12d
+
+    section 测试上线
+    集成测试      :         test, after dev1, 5d
+    正式上线      :milestone, m1, after test, 0d`,
+
+    er: `erDiagram
+    USER ||--o{ ORDER : "下单"
+    USER {
+        int id PK
+        string name
+        string email
+        datetime created_at
+    }
+    ORDER ||--|{ ORDER_ITEM : "包含"
+    ORDER {
+        int id PK
+        int user_id FK
+        string status
+        decimal total
+    }
+    ORDER_ITEM {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int qty
+        decimal price
+    }
+    PRODUCT ||--o{ ORDER_ITEM : "被购买"
+    PRODUCT {
+        int id PK
+        string name
+        decimal price
+        int stock
+    }`,
+
+    mindmap: `mindmap
+  root((技术栈))
+    前端
+      框架
+        React
+        Vue
+        Svelte
+      构建
+        Vite
+        Webpack
+    后端
+      语言
+        Go
+        Node.js
+        Python
+      数据库
+        PostgreSQL
+        Redis
+        MongoDB
+    DevOps
+      容器
+        Docker
+        Kubernetes
+      CI/CD
+        GitHub Actions
+        Jenkins`,
+};
+
+// ── 初始化 Mermaid ────────────────────────────────────────────────────────────
+mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    securityLevel: 'loose',
+    flowchart: { useMaxWidth: false, htmlLabels: true },
+    sequence:  { useMaxWidth: false },
+    gantt:     { useMaxWidth: false },
+    er:        { useMaxWidth: false },
+});
+
+// ── DOM 引用 ──────────────────────────────────────────────────────────────────
+const editor      = document.getElementById('editor');
+const previewBody = document.getElementById('previewBody');
+const spinner     = document.getElementById('spinner');
+const statusMsg   = document.getElementById('statusMsg');
+const diagramSize = document.getElementById('diagramSize');
+const bgSelect    = document.getElementById('bgSelect');
+const bgColor     = document.getElementById('bgColor');
+const paddingInput= document.getElementById('padding');
+const scaleSelect = document.getElementById('scaleSelect');
+const offscreen   = document.getElementById('offscreen');
+
+let currentSvgEl  = null;   // 当前渲染的 SVG 元素
+let diagramId     = 0;
+
+// ── 渲染 ──────────────────────────────────────────────────────────────────────
+async function render() {
+    const code = editor.value.trim();
+    if (!code) {
+        previewBody.innerHTML = `<div class="empty-hint"><div class="icon">📊</div><div>请输入 Mermaid 代码</div></div>`;
+        currentSvgEl = null;
+        return;
+    }
+
+    spinner.classList.add('active');
+    setStatus('渲染中...');
+
+    try {
+        const id = `mermaid-${++diagramId}`;
+        // mermaid.render 返回 { svg }
+        const { svg } = await mermaid.render(id, code);
+
+        // 注入预览
+        const wrap = document.createElement('div');
+        wrap.id = 'diagram-wrap';
+        wrap.innerHTML = svg;
+        currentSvgEl = wrap.querySelector('svg');
+
+        // 修正 SVG：确保有明确的 viewBox，去掉 max-width 限制
+        normalizeSvg(currentSvgEl);
+
+        previewBody.innerHTML = '';
+        previewBody.appendChild(wrap);
+
+        const w = Math.round(currentSvgEl.viewBox.baseVal.width  || currentSvgEl.getBoundingClientRect().width);
+        const h = Math.round(currentSvgEl.viewBox.baseVal.height || currentSvgEl.getBoundingClientRect().height);
+        diagramSize.textContent = `图形尺寸: ${w} × ${h} px`;
+        setStatus('✅ 渲染成功');
+    } catch (err) {
+        previewBody.innerHTML = `<div class="error-box">❌ 语法错误\n\n${err.message || err}</div>`;
+        currentSvgEl = null;
+        setStatus('❌ 渲染失败');
+        diagramSize.textContent = '';
+    } finally {
+        spinner.classList.remove('active');
+    }
+}
+
+// 规范化 SVG：确保 viewBox 存在，移除百分比宽高
+function normalizeSvg(svg) {
+    const rect = svg.getBoundingClientRect();
+    if (!svg.hasAttribute('viewBox') || svg.getAttribute('viewBox') === '') {
+        const w = parseFloat(svg.getAttribute('width'))  || rect.width  || 800;
+        const h = parseFloat(svg.getAttribute('height')) || rect.height || 600;
+        svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    }
+    // 去掉 max-width:100% 样式，避免导出被压缩
+    svg.style.maxWidth = 'none';
+}
+
+// ── 获取导出背景色 ────────────────────────────────────────────────────────────
+function getExportBg() {
+    const val = bgSelect.value;
+    return val === 'custom' ? bgColor.value : val;
+}
+
+// ── SVG 字符串 → base64 data URL（兼容 file:// 协议）────────────────────────
+function svgToDataUrl(svgStr) {
+    // 使用 base64 编码，避免 blob URL 在 file:// 下 img.onload 不触发的问题
+    // unescape+encodeURIComponent 处理中文等多字节字符
+    const encoded = btoa(unescape(encodeURIComponent(svgStr)));
+    return 'data:image/svg+xml;base64,' + encoded;
+}
+
+// ── 构建带 padding 的 SVG 克隆 ────────────────────────────────────────────────
+function buildExportSvgStr(pad) {
+    const svgClone = currentSvgEl.cloneNode(true);
+    svgClone.style.maxWidth = 'none';
+    svgClone.removeAttribute('style');   // 去掉内联 style，防止干扰尺寸
+
+    // 读取原始尺寸（优先 viewBox，其次 width/height 属性，最后 getBBox）
+    let svgW, svgH;
+    const vb = currentSvgEl.viewBox && currentSvgEl.viewBox.baseVal;
+    if (vb && vb.width > 0 && vb.height > 0) {
+        svgW = vb.width;
+        svgH = vb.height;
+    } else {
+        // 通过 getBBox 获取实际内容边界（更精确）
+        try {
+            const bb = currentSvgEl.getBBox();
+            svgW = bb.x + bb.width;
+            svgH = bb.y + bb.height;
+        } catch (_) {}
+        svgW = svgW || parseFloat(currentSvgEl.getAttribute('width'))  || 800;
+        svgH = svgH || parseFloat(currentSvgEl.getAttribute('height')) || 600;
+    }
+
+    // 设置导出尺寸（加入 padding）
+    const exportW = svgW + pad * 2;
+    const exportH = svgH + pad * 2;
+    svgClone.setAttribute('width',   exportW);
+    svgClone.setAttribute('height',  exportH);
+    svgClone.setAttribute('viewBox', `-${pad} -${pad} ${exportW} ${exportH}`);
+    // 确保 xmlns
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    const serializer = new XMLSerializer();
+    return { svgStr: serializer.serializeToString(svgClone), exportW, exportH, svgW, svgH };
+}
+
+// ── 导出 PNG ──────────────────────────────────────────────────────────────────
+async function exportPng() {
+    if (!currentSvgEl) { alert('请先渲染图形'); return; }
+
+    const scale = parseFloat(scaleSelect.value) || 2;
+    const pad   = parseInt(paddingInput.value)  || 0;
+    const bg    = getExportBg();
+
+    setStatus('正在生成高清 PNG...');
+    spinner.classList.add('active');
+
+    try {
+        const { svgStr, exportW, exportH } = buildExportSvgStr(pad);
+
+        // ★ 关键：用 base64 data URL，完全绕开 file:// 安全限制
+        const dataUrl = svgToDataUrl(svgStr);
+
+        const canvasW = Math.ceil(exportW * scale);
+        const canvasH = Math.ceil(exportH * scale);
+
+        await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width  = canvasW;
+                canvas.height = canvasH;
+                const ctx = canvas.getContext('2d');
+
+                // 背景填充
+                if (bg && bg !== 'transparent') {
+                    ctx.fillStyle = bg;
+                    ctx.fillRect(0, 0, canvasW, canvasH);
+                }
+
+                // 绘制（整体 scale 倍放大）
+                ctx.drawImage(img, 0, 0, canvasW, canvasH);
+
+                // 同步获取 PNG（避免 toBlob 回调在 file:// 下可能不触发）
+                const pngDataUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href     = pngDataUrl;
+                a.download = `diagram-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                spinner.classList.remove('active');
+                setStatus(`✅ PNG 导出成功 (${canvasW} × ${canvasH} px)`);
+                resolve();
+            };
+            img.onerror = () => {
+                reject(new Error('SVG 图像加载失败，请检查图形是否含有外部资源'));
+            };
+            img.src = dataUrl;
+        });
+
+    } catch (err) {
+        spinner.classList.remove('active');
+        setStatus('❌ PNG 导出失败: ' + err.message);
+        console.error(err);
+    }
+}
+
+// ── 导出 SVG ──────────────────────────────────────────────────────────────────
+function exportSvg() {
+    if (!currentSvgEl) { alert('请先渲染图形'); return; }
+
+    const pad = parseInt(paddingInput.value) || 0;
+    const bg  = getExportBg();
+
+    // 复用统一的构建函数
+    let { svgStr, exportW, exportH } = buildExportSvgStr(pad);
+
+    // 若需背景，注入 <rect> 到 SVG 字符串（在 <svg ...> 标签结束后立即插入）
+    if (bg && bg !== 'transparent') {
+        const bgRect = `<rect x="-${pad}" y="-${pad}" width="${exportW}" height="${exportH}" fill="${bg}"/>`;
+        svgStr = svgStr.replace(/(<svg[^>]*>)/, `$1${bgRect}`);
+    }
+
+    // 加 XML 声明
+    svgStr = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgStr;
+
+    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `diagram-${Date.now()}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    setStatus('✅ SVG 导出成功');
+}
+
+// ── 复制 SVG 代码 ─────────────────────────────────────────────────────────────
+async function copySvg() {
+    if (!currentSvgEl) { alert('请先渲染图形'); return; }
+    const serializer = new XMLSerializer();
+    let svgStr = serializer.serializeToString(currentSvgEl);
+    if (!svgStr.includes('xmlns=')) {
+        svgStr = svgStr.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    try {
+        await navigator.clipboard.writeText(svgStr);
+        setStatus('✅ SVG 代码已复制到剪贴板');
+    } catch {
+        setStatus('❌ 复制失败（请手动复制）');
+    }
+}
+
+// ── 状态栏 ────────────────────────────────────────────────────────────────────
+let statusTimer;
+function setStatus(msg) {
+    statusMsg.textContent = msg;
+    clearTimeout(statusTimer);
+    if (msg.startsWith('✅')) {
+        statusTimer = setTimeout(() => { statusMsg.textContent = '就绪'; }, 4000);
+    }
+}
+
+// ── 事件绑定 ──────────────────────────────────────────────────────────────────
+document.getElementById('renderBtn').addEventListener('click', render);
+document.getElementById('clearBtn').addEventListener('click', () => {
+    editor.value = '';
+    previewBody.innerHTML = `<div class="empty-hint"><div class="icon">📊</div><div>粘贴 Mermaid 代码后点击<b>渲染预览</b><br>或按 <b>Ctrl+Enter</b></div></div>`;
+    currentSvgEl = null;
+    diagramSize.textContent = '';
+    setStatus('已清空');
+});
+document.getElementById('exportPng').addEventListener('click', exportPng);
+document.getElementById('exportSvg').addEventListener('click', exportSvg);
+document.getElementById('copySvg').addEventListener('click',   copySvg);
+
+// Ctrl+Enter 渲染
+editor.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        render();
+    }
+});
+
+// 背景选择
+bgSelect.addEventListener('change', () => {
+    bgColor.style.display = bgSelect.value === 'custom' ? 'inline-block' : 'none';
+});
+
+// 示例按钮
+document.querySelectorAll('.sample-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const type = btn.dataset.type;
+        if (SAMPLES[type]) {
+            editor.value = SAMPLES[type];
+            render();
+        }
+    });
+});
+
+// 粘贴时自动渲染
+editor.addEventListener('paste', () => {
+    setTimeout(render, 50);
+});
+
+// ── 初始示例 ──────────────────────────────────────────────────────────────────
+editor.value = SAMPLES.flowchart;
+render();
+</script>
+</body>
+</html>
